@@ -2,8 +2,8 @@
 
 import { DragEvent, KeyboardEvent, useEffect, useRef, useState, type CSSProperties } from "react";
 import { Check, Image as ImageIcon, ScanLine, Search } from "lucide-react";
-import "@/app/puzzle-upgrade.css";
 import { useFogAudio } from "@/components/audio/AudioProvider";
+import { ProvisionalTheory } from "@/components/narrative/ProvisionalTheory";
 import { PhotoInspection } from "@/components/puzzles/PhotoInspection";
 import { puzzleGuidance } from "@/lib/case-data";
 import {
@@ -92,6 +92,7 @@ export function PhotoPuzzle() {
   };
 
   const scanRestoration = () => {
+    if (stage !== "assembling" || scanTimer.current !== null) return;
     recordAttempt("photo");
     const misplaced = countMisplacedPhotoPieces(pieces);
     if (misplaced > 0) {
@@ -117,8 +118,9 @@ export function PhotoPuzzle() {
   if (solved) {
     return (
       <section className="solved-photo-panel solved-photo-panel--upgraded">
-        <div className="puzzle-success"><Check size={20} aria-hidden="true" /><div><strong>照片与现场细节已核验</strong><p>白鹭七号 / H-1707。水线外侧的第二道人影证明林知夏落水后仍有人靠近检修梯。</p></div></div>
-        <div className="photo-complete-preview" style={{ "--photo-complete": `url("${visualAssets.cctvPuzzle}")` } as CSSProperties} role="img" aria-label="复原的第七码头照片，船体编号 H-1707，码头外侧有第二道人影"><span>H-1707 / 第二道人影已登记</span></div>
+        <div className="puzzle-success"><Check size={20} aria-hidden="true" /><div><strong>照片与现场细节已核验</strong><p>白鹭七号 / H-1707。第一道人影是林知夏；第二道人影靠近检修梯。远处监控室窗口仍有一处控制灯亮着。</p></div></div>
+        <div className="photo-complete-preview" style={{ "--photo-complete": `url("${visualAssets.cctvPuzzle}")` } as CSSProperties} role="img" aria-label="复原的第七码头照片，船体编号 H-1707，码头外侧有第二道人影，远处监控室窗口仍亮着"><span>H-1707 / 第二道人影 / 控制室亮点</span></div>
+        <ProvisionalTheory compact />
       </section>
     );
   }

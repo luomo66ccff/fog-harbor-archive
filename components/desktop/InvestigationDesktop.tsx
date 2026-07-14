@@ -11,6 +11,8 @@ import { CurrentTaskCard } from "@/components/desktop/CurrentTaskCard";
 import { HarborAtmosphere } from "@/components/desktop/HarborAtmosphere";
 import { LockedModuleDialog } from "@/components/desktop/LockedModuleDialog";
 import { UnlockNotificationQueue } from "@/components/desktop/UnlockNotificationQueue";
+import { EnvironmentalSecrets } from "@/components/narrative/EnvironmentalSecrets";
+import { NarrativeEventLayer } from "@/components/narrative/NarrativeEventLayer";
 import { ArchiveWindow } from "@/components/windows/ArchiveWindow";
 import { EvidenceWindow } from "@/components/windows/EvidenceWindow";
 import { FinaleWindow } from "@/components/windows/FinaleWindow";
@@ -154,6 +156,7 @@ export function InvestigationDesktop({ onLeave }: { onLeave: () => void }) {
   return (
     <main className="investigation-desktop" data-story-time={clock}>
       <HarborAtmosphere dimmed={windowsVisible} />
+      <EnvironmentalSecrets frequencySolved={completed.includes("frequency")} runCount={runCount} />
       <div className="desk-grain" aria-hidden="true" />
       <header className="case-statusbar">
         <div><span className="status-seal">雾港港务局</span><strong>P-07-0712</strong><small>调查员 / {code}</small></div>
@@ -207,6 +210,7 @@ export function InvestigationDesktop({ onLeave }: { onLeave: () => void }) {
       </nav>
 
       <UnlockNotificationQueue />
+      <NarrativeEventLayer onNavigate={navigate} />
       <LockedModuleDialog access={lockedAccess} onClose={() => setLockedAccess(null)} onNavigate={navigate} />
     </main>
   );

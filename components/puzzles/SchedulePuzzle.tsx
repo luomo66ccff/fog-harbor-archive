@@ -2,7 +2,6 @@
 
 import { useMemo, useState, type CSSProperties } from "react";
 import { Check, FileClock, Search } from "lucide-react";
-import "@/app/puzzle-upgrade.css";
 import { useFogAudio } from "@/components/audio/AudioProvider";
 import { TimelineAlignment } from "@/components/puzzles/TimelineAlignment";
 import { puzzleGuidance } from "@/lib/case-data";

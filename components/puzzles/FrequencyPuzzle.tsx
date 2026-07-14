@@ -2,7 +2,6 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Check, Eye, Gauge, Pause, Play, Radio, ScanLine, Search } from "lucide-react";
-import "@/app/puzzle-upgrade.css";
 import { useFogAudio } from "@/components/audio/AudioProvider";
 import { puzzleGuidance } from "@/lib/case-data";
 import {

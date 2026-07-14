@@ -132,3 +132,14 @@ export interface CaseEnding {
   title: string;
   body: string[];
 }
+
+export type {
+  EasterEggId,
+  NarrativeContext,
+  NarrativeEvent,
+  NarrativeEventId,
+  NarrativeState,
+  NarrativeTrigger,
+  ProvisionalTheoryState,
+  SecondFigureTheory,
+} from "./narrative";

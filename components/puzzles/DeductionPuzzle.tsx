@@ -3,22 +3,16 @@
 import { DragEvent, useMemo, useState } from "react";
 import { Check, Link2, Paperclip, Search, ShieldAlert, X } from "lucide-react";
 import { useFogAudio } from "@/components/audio/AudioProvider";
+import { CaseReflection } from "@/components/narrative/CaseReflection";
 import { puzzleGuidance } from "@/lib/case-data";
 import { evidenceTitle, deductionEvidenceRequirements, evaluateDeductionSubmission, getVerifiedEvidenceIds } from "@/lib/evidence-engine";
-import { deductionSlots } from "@/lib/puzzle-engine";
+import { deductionSlots, deductionTokens, getDeductionToken, placeDeductionToken, shouldRevealDeductionTypes } from "@/lib/puzzle-engine";
 import { useCaseStore } from "@/store/case-store";
+import type { DeductionPlacement } from "@/types/puzzle";
 
 type SlotId = (typeof deductionSlots)[number];
-type Token = { id: string; label: string; slot: SlotId };
 
 const slotLabels: Record<SlotId, string> = { person: "人物", time: "时间", place: "地点", action: "行为", motive: "目的" };
-const tokens: Token[] = [
-  { id: "zhou-jiming", label: "周既明", slot: "person" }, { id: "gu-weian", label: "顾惟安", slot: "person" }, { id: "xu-wancheng", label: "许晚澄", slot: "person" },
-  { id: "00:31", label: "00:31", slot: "time" }, { id: "00:39", label: "00:39", slot: "time" }, { id: "01:07", label: "01:07", slot: "time" },
-  { id: "loc-control", label: "监控室", slot: "place" }, { id: "loc-pier7", label: "第七码头", slot: "place" }, { id: "loc-weather", label: "气象站", slot: "place" },
-  { id: "clock-shift", label: "快调系统主时钟", slot: "action" }, { id: "erase-rain", label: "删除原始天气", slot: "action" }, { id: "open-gate", label: "打开七号外闸", slot: "action" },
-  { id: "hide-heron", label: "掩盖白鹭七号靠泊", slot: "motive" }, { id: "fake-call", label: "伪造家属通话", slot: "motive" }, { id: "protect-lin", label: "保护林知夏离港", slot: "motive" },
-];
 
 export function DeductionPuzzle() {
   const solved = useCaseStore((state) => state.completedPuzzles.includes("deduction"));
@@ -30,13 +24,15 @@ export function DeductionPuzzle() {
   const completePuzzle = useCaseStore((state) => state.completePuzzle);
   const recordAttempt = useCaseStore((state) => state.recordAttempt);
   const markTaskProgress = useCaseStore((state) => state.markTaskProgress);
+  const deductionAttempts = useCaseStore((state) => state.puzzleAttempts.deduction ?? 0);
+  const assistedInvestigation = useCaseStore((state) => state.assistedInvestigation);
   const { cue } = useFogAudio();
-  const [values, setValues] = useState<Partial<Record<SlotId, string>>>({});
+  const [values, setValues] = useState<DeductionPlacement>({});
   const [evidenceBySlot, setEvidenceBySlot] = useState<Partial<Record<SlotId, string[]>>>({});
   const [selected, setSelected] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState("把同类线索放入五个槽位，并为每一段附加已核验的交叉证据。");
+  const [feedback, setFeedback] = useState("先自由放置线索，再为每一段附加已核验的交叉证据；系统会在提交时统一报告问题。");
   const [hintIndex, setHintIndex] = useState(-1);
-  const tokenById = useMemo(() => new Map(tokens.map((token) => [token.id, token])), []);
+  const showClassification = assistedInvestigation || shouldRevealDeductionTypes(deductionAttempts);
   const verifiedIds = useMemo(() => getVerifiedEvidenceIds({
     visibleEvidenceIds: unlockedIds,
     legacyVerifiedEvidenceIds: legacyVerifiedIds,
@@ -46,14 +42,15 @@ export function DeductionPuzzle() {
   }), [legacyVerifiedIds, relations, touchedIds, unlockedIds, verdicts]);
 
   const assign = (tokenId: string, slot: SlotId) => {
-    const token = tokenById.get(tokenId);
-    if (!token || token.slot !== slot) {
-      setFeedback(`这个线索不属于“${slotLabels[slot]}”槽位。`);
+    const token = getDeductionToken(tokenId);
+    if (!token) {
+      setFeedback("这枚线索无法被系统识别，请重新选择。");
       cue("error");
       return;
     }
-    setValues((current) => ({ ...current, [slot]: tokenId }));
+    setValues((current) => placeDeductionToken(current, tokenId, slot));
     setSelected(null);
+    setFeedback(`已将“${token.label}”放入“${slotLabels[slot]}”槽位。系统会在提交时统一检查分类与逻辑。`);
     cue("paper");
   };
 
@@ -84,11 +81,14 @@ export function DeductionPuzzle() {
       cue("unlock");
       return;
     }
-    setFeedback(`本次提交：逻辑节点错误 ${result.logicErrors} 处，证据支持不足 ${result.evidenceSupportMissing} 段，互相矛盾的附件 ${result.contradictionCount} 组。`);
+    const classificationReveal = shouldRevealDeductionTypes(deductionAttempts + 1)
+      ? " 已开放线索分类标签，可据此重新整理槽位。"
+      : " 再失败一次后，系统将开放线索分类标签。";
+    setFeedback(`本次提交：分类错位 ${result.typeErrors} 处，逻辑节点错误 ${result.logicErrors} 处，证据支持不足 ${result.evidenceSupportMissing} 段，互相矛盾的附件 ${result.contradictionCount} 组。${classificationReveal}`);
     cue("error");
   };
 
-  if (solved) return <section className="puzzle-success"><Check size={20} aria-hidden="true" /><div><strong>责任链已闭合</strong><p>五段逻辑均已由独立记录交叉支持，最终卷宗可以安全打开。</p></div></section>;
+  if (solved) return <div className="deduction-resolution"><section className="puzzle-success"><Check size={20} aria-hidden="true" /><div><strong>责任链已闭合</strong><p>五段逻辑均已由独立记录交叉支持。系统不再把所有撒谎者压成同一种责任。</p></div></section><CaseReflection /></div>;
 
   return (
     <section className="puzzle-panel deduction-puzzle" aria-labelledby="deduction-title">
@@ -97,11 +97,11 @@ export function DeductionPuzzle() {
       <div className="deduction-chain">
         {deductionSlots.map((slot, index) => {
           const value = values[slot];
-          const token = value ? tokenById.get(value) : null;
+          const token = value ? getDeductionToken(value) : null;
           return <div key={slot} className="chain-wrap"><div className={`chain-slot ${token ? "is-filled" : ""}`} onDragOver={(event) => event.preventDefault()} onDrop={(event) => onDrop(event, slot)}><button type="button" className="chain-slot-target" onClick={() => { if (selected) assign(selected, slot); }}><small>{slotLabels[slot]}</small><strong>{token?.label ?? "放入线索"}</strong></button>{token && <button type="button" className="chain-slot-clear" onClick={() => setValues((current) => ({ ...current, [slot]: undefined }))} aria-label={`清除${slotLabels[slot]}`}><X size={13} /></button>}</div>{index < deductionSlots.length - 1 && <i aria-hidden="true">→</i>}</div>;
         })}
       </div>
-      <div className="token-bank" aria-label="可用推理线索">{tokens.map((token) => <button type="button" draggable key={token.id} onDragStart={(event) => event.dataTransfer.setData("text/deduction-token", token.id)} onClick={() => setSelected(token.id)} className={selected === token.id ? "is-selected" : ""} aria-pressed={selected === token.id}><small>{slotLabels[token.slot]}</small>{token.label}</button>)}</div>
+      <div className="token-bank" aria-label="可用推理线索">{deductionTokens.map((token) => <button type="button" draggable key={token.id} onDragStart={(event) => event.dataTransfer.setData("text/deduction-token", token.id)} onClick={() => setSelected(token.id)} className={selected === token.id ? "is-selected" : ""} aria-pressed={selected === token.id} aria-label={showClassification ? `${token.label}，分类：${slotLabels[token.category]}` : token.label}><small>{showClassification ? slotLabels[token.category] : "未分类"}</small>{token.label}</button>)}</div>
 
       <section className="deduction-evidence" aria-labelledby="deduction-evidence-title">
         <header><Paperclip size={16} aria-hidden="true" /><div><strong id="deduction-evidence-title">附加核验证据</strong><span>绿色条目可作为有效支持；灰色条目需要先在证据墙完成判断。</span></div></header>

@@ -10,7 +10,17 @@ import type {
   UnlockEventId,
 } from "@/types/case";
 import type { EvidenceRelationKind, EvidenceRelations, EvidenceVerdict } from "@/types/evidence";
+import type {
+  EasterEggId,
+  NarrativeEventId,
+  NarrativeState,
+  ProvisionalTheoryState,
+  SecondFigureTheory,
+} from "@/types/narrative";
 import { evidence, initialEvidenceIds, puzzleRewards } from "@/lib/evidence-data";
+import { isEasterEggId, recordEasterEggDiscovery } from "@/lib/easter-egg-engine";
+import { isNarrativeEventId } from "@/lib/narrative-engine";
+import { useWindowStore } from "@/store/window-store";
 
 export const SAVE_KEY = "fog-harbor-save-v1";
 
@@ -21,7 +31,7 @@ export interface AudioSettings {
   interface: boolean;
 }
 
-interface CaseState {
+interface CaseState extends NarrativeState {
   hydrated: boolean;
   investigatorCode: string;
   bootSeen: boolean;
@@ -60,6 +70,10 @@ interface CaseState {
   setCaseNote: (note: string) => void;
   recordAttempt: (id: PuzzleId) => void;
   markTaskProgress: (taskId: InvestigationTaskId, itemId: string) => void;
+  markNarrativeEventSeen: (id: NarrativeEventId) => void;
+  discoverEasterEgg: (id: EasterEggId) => void;
+  setSecondFigureTheory: (value: SecondFigureTheory) => void;
+  setAssistedInvestigation: (value: boolean) => void;
   completePuzzle: (id: PuzzleId) => void;
   identifyAnonymous: () => void;
   chooseEnding: (id: EndingId) => void;
@@ -93,6 +107,12 @@ export type PersistedCaseState = Pick<
   | "endingsSeen"
   | "puzzleAttempts"
   | "taskProgress"
+  | "seenNarrativeEvents"
+  | "discoveredEasterEggs"
+  | "provisionalTheory"
+  | "theoryHistory"
+  | "assistedInvestigation"
+  | "runStartedAt"
   | "audio"
   | "soundDegraded"
 >;
@@ -137,6 +157,53 @@ function endingArrayOr(value: unknown, fallback: EndingId[]): EndingId[] {
   return Array.isArray(value) && value.every(isEndingId)
     ? Array.from(new Set(value))
     : [...fallback];
+}
+
+function narrativeEventArrayOr(value: unknown, fallback: NarrativeEventId[] = []): NarrativeEventId[] {
+  return Array.isArray(value)
+    ? unique(value.filter(isNarrativeEventId))
+    : [...fallback];
+}
+
+function easterEggArrayOr(value: unknown, fallback: EasterEggId[] = []): EasterEggId[] {
+  return Array.isArray(value)
+    ? unique(value.filter(isEasterEggId))
+    : [...fallback];
+}
+
+function isSecondFigureTheory(value: unknown): value is SecondFigureTheory {
+  return value === "pursuer" || value === "rescuer" || value === "unknown";
+}
+
+function isTheoryHistoryEntry(value: unknown): value is string {
+  if (isSecondFigureTheory(value)) return true;
+  if (typeof value !== "string") return false;
+  const [before, after, extra] = value.split("->");
+  return extra === undefined
+    && isSecondFigureTheory(before)
+    && isSecondFigureTheory(after)
+    && before !== after;
+}
+
+function provisionalTheoryOr(
+  value: unknown,
+  fallback: ProvisionalTheoryState = {},
+): ProvisionalTheoryState {
+  if (!isRecord(value)) return { ...fallback };
+  return isSecondFigureTheory(value.secondFigure)
+    ? { secondFigure: value.secondFigure }
+    : {};
+}
+
+function theoryHistoryOr(value: unknown, fallback: string[] = []): string[] {
+  if (!Array.isArray(value)) return [...fallback];
+  return value.filter(isTheoryHistoryEntry).slice(-64);
+}
+
+function runStartedAtOr(value: unknown, fallback: number) {
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? value
+    : fallback;
 }
 
 function verdictRecordOr(value: unknown, fallback: Record<string, EvidenceVerdict>): Record<string, EvidenceVerdict> {
@@ -240,6 +307,12 @@ function persistedSnapshot(state: CaseState): PersistedCaseState {
     endingsSeen: state.endingsSeen,
     puzzleAttempts: state.puzzleAttempts,
     taskProgress: state.taskProgress,
+    seenNarrativeEvents: state.seenNarrativeEvents,
+    discoveredEasterEggs: state.discoveredEasterEggs,
+    provisionalTheory: state.provisionalTheory,
+    theoryHistory: state.theoryHistory,
+    assistedInvestigation: state.assistedInvestigation,
+    runStartedAt: state.runStartedAt,
     audio: state.audio,
     soundDegraded: state.soundDegraded,
   };
@@ -283,6 +356,14 @@ export function sanitizePersistedCaseState(
     endingsSeen: endingArrayOr(source.endingsSeen, fallback.endingsSeen),
     puzzleAttempts: puzzleAttemptsOr(source.puzzleAttempts, fallback.puzzleAttempts),
     taskProgress: taskProgressOr(source.taskProgress, fallback.taskProgress),
+    seenNarrativeEvents: narrativeEventArrayOr(source.seenNarrativeEvents, fallback.seenNarrativeEvents),
+    discoveredEasterEggs: easterEggArrayOr(source.discoveredEasterEggs, fallback.discoveredEasterEggs),
+    provisionalTheory: provisionalTheoryOr(source.provisionalTheory, fallback.provisionalTheory),
+    theoryHistory: theoryHistoryOr(source.theoryHistory, fallback.theoryHistory),
+    assistedInvestigation: typeof source.assistedInvestigation === "boolean"
+      ? source.assistedInvestigation
+      : (fallback.assistedInvestigation ?? false),
+    runStartedAt: runStartedAtOr(source.runStartedAt, fallback.runStartedAt ?? Date.now()),
     audio: audioSettingsOr(source.audio, fallback.audio),
     soundDegraded: typeof source.soundDegraded === "boolean" ? source.soundDegraded : fallback.soundDegraded,
   };
@@ -304,11 +385,13 @@ const freshProgress = {
   currentEnding: null as EndingId | null,
   puzzleAttempts: {} as Partial<Record<PuzzleId, number>>,
   taskProgress: {} as TaskProgress,
+  provisionalTheory: {} as ProvisionalTheoryState,
+  theoryHistory: [] as string[],
   unlockQueue: [] as UnlockEventId[],
   lastUnlock: null as string | null,
 };
 
-function unique(values: string[]) {
+function unique<T extends string>(values: readonly T[]): T[] {
   return Array.from(new Set(values));
 }
 
@@ -321,6 +404,10 @@ export const useCaseStore = create<CaseState>()(
       runCount: 1,
       completedRuns: 0,
       endingsSeen: [],
+      seenNarrativeEvents: [],
+      discoveredEasterEggs: [],
+      assistedInvestigation: false,
+      runStartedAt: Date.now(),
       audio: { muted: false, volume: 0.42, ambient: true, interface: true },
       soundDegraded: false,
       ...freshProgress,
@@ -370,6 +457,21 @@ export const useCaseStore = create<CaseState>()(
           },
         }));
       },
+      markNarrativeEventSeen: (id) => set((state) => ({
+        seenNarrativeEvents: unique([...state.seenNarrativeEvents, id]),
+      })),
+      discoverEasterEgg: (id) => set((state) => ({
+        discoveredEasterEggs: recordEasterEggDiscovery(state.discoveredEasterEggs, id),
+      })),
+      setSecondFigureTheory: (value) => set((state) => {
+        const previous = state.provisionalTheory.secondFigure;
+        if (previous === value) return state;
+        return {
+          provisionalTheory: { ...state.provisionalTheory, secondFigure: value },
+          theoryHistory: [...state.theoryHistory, previous ? `${previous}->${value}` : value],
+        };
+      }),
+      setAssistedInvestigation: (value) => set({ assistedInvestigation: value }),
       completePuzzle: (id) => {
         if (get().completedPuzzles.includes(id)) return;
         const rewards = puzzleRewards[id] ?? [];
@@ -393,6 +495,12 @@ export const useCaseStore = create<CaseState>()(
         currentEnding: id,
         completedRuns: state.currentEnding ? state.completedRuns : state.completedRuns + 1,
         endingsSeen: unique([...state.endingsSeen, id]) as EndingId[],
+        seenNarrativeEvents: id === "seventh"
+          ? unique<NarrativeEventId>([...state.seenNarrativeEvents, "investigator-file-created"])
+          : state.seenNarrativeEvents,
+        discoveredEasterEggs: id === "seventh"
+          ? recordEasterEggDiscovery(state.discoveredEasterEggs, "investigator-index")
+          : state.discoveredEasterEggs,
       })),
       dismissUnlock: () => set({ lastUnlock: null }),
       dismissUnlockNotification: (id) => set((state) => {
@@ -410,20 +518,31 @@ export const useCaseStore = create<CaseState>()(
         runCount: state.runCount + 1,
         completedRuns: state.completedRuns,
         endingsSeen: state.endingsSeen,
+        seenNarrativeEvents: state.seenNarrativeEvents,
+        discoveredEasterEggs: state.discoveredEasterEggs,
+        assistedInvestigation: state.assistedInvestigation,
+        runStartedAt: Date.now(),
         audio: state.audio,
         soundDegraded: state.soundDegraded,
       })),
-      clearAllProgress: () => set((state) => ({
-        ...freshProgress,
-        hydrated: true,
-        investigatorCode: "",
-        bootSeen: false,
-        runCount: 1,
-        completedRuns: 0,
-        endingsSeen: [],
-        audio: state.audio,
-        soundDegraded: state.soundDegraded,
-      })),
+      clearAllProgress: () => {
+        useWindowStore.getState().resetEasterEggSession();
+        set((state) => ({
+          ...freshProgress,
+          hydrated: true,
+          investigatorCode: "",
+          bootSeen: false,
+          runCount: 1,
+          completedRuns: 0,
+          endingsSeen: [],
+          seenNarrativeEvents: [],
+          discoveredEasterEggs: [],
+          assistedInvestigation: false,
+          runStartedAt: Date.now(),
+          audio: state.audio,
+          soundDegraded: state.soundDegraded,
+        }));
+      },
     }),
     {
       name: SAVE_KEY,

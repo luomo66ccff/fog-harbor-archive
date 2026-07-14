@@ -1,5 +1,6 @@
 import { evidence } from "@/lib/evidence-data";
-import { deductionAnswer, deductionSlots } from "@/lib/puzzle-engine";
+import { deductionSlots, evaluateDeductionPlacement } from "@/lib/puzzle-engine";
+import type { DeductionPlacement, DeductionSubmissionEvaluation } from "@/types/puzzle";
 import type { EvidenceRelationSelection, EvidenceRelations, EvidenceVerdict } from "@/types/evidence";
 
 type DeductionSlot = (typeof deductionSlots)[number];
@@ -93,13 +94,13 @@ export function getVerifiedEvidenceIds({
 }
 
 export function evaluateDeductionSubmission(
-  values: Partial<Record<DeductionSlot, string>>,
+  values: DeductionPlacement,
   evidenceBySlot: Partial<Record<DeductionSlot, string[]>>,
   verifiedEvidenceIds: string[],
   relations: EvidenceRelations,
-) {
+): DeductionSubmissionEvaluation {
   const verified = new Set(verifiedEvidenceIds);
-  const logicErrors = deductionSlots.filter((slot) => values[slot] !== deductionAnswer[slot]).length;
+  const { typeErrors, logicErrors } = evaluateDeductionPlacement(values);
   const evidenceSupportMissing = deductionSlots.filter((slot) => {
     const attached = evidenceBySlot[slot] ?? [];
     return !attached.some((id) => verified.has(id) && deductionEvidenceRequirements[slot].includes(id));
@@ -113,7 +114,8 @@ export function evaluateDeductionSubmission(
     }
   }
   return {
-    solved: logicErrors === 0 && evidenceSupportMissing === 0 && conflicts.size === 0,
+    solved: typeErrors === 0 && logicErrors === 0 && evidenceSupportMissing === 0 && conflicts.size === 0,
+    typeErrors,
     logicErrors,
     evidenceSupportMissing,
     contradictionCount: conflicts.size,
