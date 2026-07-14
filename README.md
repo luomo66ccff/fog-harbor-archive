@@ -44,6 +44,8 @@ npx tsc --noEmit --incremental false
 
 服务器版本使用 `Dockerfile.server` 和 `compose.server.yaml`。应用容器只映射到主机 `127.0.0.1:8797`，`cloudflared` 容器通过同一 Compose 网络访问应用，公网不需要开放应用端口。
 
+当前生产入口为 `https://fog-harbor-archive.luomo.moe`。
+
 部署机需要 Docker 与 Docker Compose，并在未提交的 `.env.server` 中提供远程管理 Tunnel 的 `TUNNEL_TOKEN`：
 
 ```bash

@@ -6,7 +6,7 @@ RUN npm ci
 FROM dependencies AS builder
 WORKDIR /app
 COPY . .
-ARG NEXT_PUBLIC_SITE_URL=https://archive.luomo.moe
+ARG NEXT_PUBLIC_SITE_URL=https://fog-harbor-archive.luomo.moe
 ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL \
     FOG_HARBOR_SERVER_BUILD=1 \
     NEXT_TELEMETRY_DISABLED=1
