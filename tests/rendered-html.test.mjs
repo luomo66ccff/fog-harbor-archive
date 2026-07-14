@@ -26,7 +26,7 @@ test("server-renders the finished fog harbor archive shell", async () => {
 });
 
 test("ships the complete playable investigation structure", async () => {
-  const [page, layout, caseData, evidenceData, puzzleEngine, store, packageJson, css, responsiveCss] = await Promise.all([
+  const [page, layout, caseData, evidenceData, puzzleEngine, store, packageJson, css, responsiveCss, puzzleCss, visualCss, evidenceCss] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../lib/case-data.ts", import.meta.url), "utf8"),
@@ -36,6 +36,9 @@ test("ships the complete playable investigation structure", async () => {
     readFile(new URL("../package.json", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../app/responsive.css", import.meta.url), "utf8"),
+    readFile(new URL("../app/puzzle-upgrade.css", import.meta.url), "utf8"),
+    readFile(new URL("../app/visual-upgrade.css", import.meta.url), "utf8"),
+    readFile(new URL("../app/evidence-upgrade.css", import.meta.url), "utf8"),
   ]);
 
   assert.match(page, /<GameClient \/>/);
@@ -54,8 +57,10 @@ test("ships the complete playable investigation structure", async () => {
   assert.ok((evidenceData.match(/^\s*\{ id: "ev-/gm) ?? []).length >= 21, "at least twenty-one evidence records");
   for (const name of ["林知夏", "周既明", "顾惟安", "许晚澄", "陈牧", "唐芷", "叶澜"]) assert.match(caseData, new RegExp(name));
   for (const answer of ["11", "0712", "H-1707", "TIDE7"]) assert.match(caseData + evidenceData + puzzleEngine + store, new RegExp(answer));
-  assert.match(css + responsiveCss, /prefers-reduced-motion/);
-  assert.doesNotMatch(css + responsiveCss, /gradient\s*\(/i, "visual system must not use CSS gradients");
+  const fullCss = css + responsiveCss + puzzleCss + visualCss + evidenceCss;
+  assert.match(fullCss, /prefers-reduced-motion/);
+  assert.match(fullCss, /harbor-atmosphere/);
+  assert.match(fullCss, /linear-gradient\s*\(/i, "the upgraded scene uses restrained depth overlays");
 
   for (const path of ["SchedulePuzzle.tsx", "FrequencyPuzzle.tsx", "PhotoPuzzle.tsx", "DeductionPuzzle.tsx", "HiddenPuzzle.tsx"]) {
     await access(new URL(`../components/puzzles/${path}`, import.meta.url));

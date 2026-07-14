@@ -1,17 +1,50 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Eye, MailOpen, MapPin, ShieldQuestion } from "lucide-react";
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
+import { Eye, LockKeyhole, MailOpen, MapPin, Minus, Plus, RotateCcw, ShieldQuestion } from "lucide-react";
 import { HiddenPuzzle } from "@/components/puzzles/HiddenPuzzle";
 import { WindowFrame } from "@/components/windows/WindowFrame";
 import { locations, messages, people, timeline } from "@/lib/case-data";
+import { visualAssets } from "@/lib/visual-assets";
 import { useCaseStore } from "@/store/case-store";
+import { useWindowStore } from "@/store/window-store";
+import type { LocationRecord, PuzzleId } from "@/types/case";
+
+interface MapHotspot extends LocationRecord {
+  unlockAfter?: PuzzleId;
+}
+
+const mapHotspots: MapHotspot[] = [
+  ...locations,
+  { id: "loc-passage", name: "外侧通道", kind: "封锁区域", x: 63, y: 69, description: "第七码头外侧的狭窄步道。照片显示 00:43 前后这里曾出现争执。", linkedEvidence: ["ev-photo", "ev-draft"], unlockAfter: "photo" },
+  { id: "loc-ladder", name: "检修梯", kind: "下层通道", x: 75, y: 78, description: "通往水线下方的维修梯。第二道人影与陈牧的工具箱都在附近被确认。", linkedEvidence: ["ev-toolbox", "ev-cctv"], unlockAfter: "photo" },
+];
+
+const mapZoomLevels = [1, 1.35, 1.7] as const;
+
+function currentTaskLocation(completed: readonly PuzzleId[]) {
+  if (!completed.includes("schedule")) return "loc-control";
+  if (!completed.includes("frequency")) return "loc-archive";
+  if (!completed.includes("photo")) return "loc-pier7";
+  if (!completed.includes("deduction")) return "loc-control";
+  return "loc-archive";
+}
 
 export function PeopleWindow() {
   const completed = useCaseStore((state) => state.completedPuzzles);
+  const intent = useWindowStore((state) => state.pendingIntents.people);
+  const consumeIntent = useWindowStore((state) => state.consumeIntent);
   const [selectedId, setSelectedId] = useState(people[0].id);
   const selected = people.find((person) => person.id === selectedId) ?? people[0];
   const reveal = completed.includes("deduction");
+  useEffect(() => {
+    if (!intent) return;
+    const frame = window.requestAnimationFrame(() => {
+      if (intent.focusId && people.some((person) => person.id === intent.focusId)) setSelectedId(intent.focusId);
+      consumeIntent("people", intent.serial);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [consumeIntent, intent]);
   return (
     <WindowFrame id="people" title="人物关系" index="P-06" className="medium-window">
       <div className="people-layout">
@@ -25,19 +58,54 @@ export function PeopleWindow() {
 export function MapWindow() {
   const completed = useCaseStore((state) => state.completedPuzzles);
   const anonymous = useCaseStore((state) => state.discoveredAnonymous);
+  const intent = useWindowStore((state) => state.pendingIntents.map);
+  const consumeIntent = useWindowStore((state) => state.consumeIntent);
   const [selectedId, setSelectedId] = useState("loc-pier7");
-  const selected = locations.find((location) => location.id === selectedId) ?? locations[0];
+  const [zoomIndex, setZoomIndex] = useState(0);
+  const hiddenIndexRef = useRef<HTMLDivElement>(null);
+  const hotspotRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const selected = mapHotspots.find((location) => location.id === selectedId) ?? mapHotspots[0];
+  const selectedUnlocked = !selected.unlockAfter || completed.includes(selected.unlockAfter);
+  const taskLocation = currentTaskLocation(completed);
+  const zoom = mapZoomLevels[zoomIndex];
+
+  useEffect(() => {
+    if (!intent) return;
+    const focusId = intent.focusId;
+    const frame = window.requestAnimationFrame(() => {
+      if (focusId === "hidden-index") {
+        hiddenIndexRef.current?.scrollIntoView({ block: "nearest" });
+      } else if (focusId && mapHotspots.some((location) => location.id === focusId)) {
+        setSelectedId(focusId);
+        window.requestAnimationFrame(() => hotspotRefs.current[focusId]?.focus());
+      }
+      consumeIntent("map", intent.serial);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [consumeIntent, intent]);
+
+  const mapStyle: CSSProperties = {
+    backgroundImage: `url(${visualAssets.map})`,
+    width: `${zoom * 100}%`,
+  };
   return (
     <WindowFrame id="map" title="港区地图" index="M-07" className="medium-window">
-      <div className="map-layout">
-        <div className="harbor-map">
-          <span className="map-watermark">雾港 / 旧版 2019</span><span className="coast-line coast-a" /><span className="coast-line coast-b" /><span className="shipping-lane lane-a" /><span className="shipping-lane lane-b" />
-          {locations.map((location) => <button type="button" key={location.id} className={selected.id === location.id ? "is-selected" : ""} style={{ left: `${location.x}%`, top: `${location.y}%` }} onClick={() => setSelectedId(location.id)} aria-label={`查看地点：${location.name}`}><MapPin size={15} /><span>{location.name}</span></button>)}
+      <div className="map-toolbar" aria-label="地图缩放控制"><button type="button" onClick={() => setZoomIndex((value) => Math.max(0, value - 1))} disabled={zoomIndex === 0} aria-label="缩小港区地图"><Minus size={16} /></button><output aria-live="polite">{Math.round(zoom * 100)}%</output><button type="button" onClick={() => setZoomIndex((value) => Math.min(mapZoomLevels.length - 1, value + 1))} disabled={zoomIndex === mapZoomLevels.length - 1} aria-label="放大港区地图"><Plus size={16} /></button><button type="button" onClick={() => setZoomIndex(0)} disabled={zoomIndex === 0}><RotateCcw size={15} /> 重置</button></div>
+      <div className="map-layout material-map-layout">
+        <div className="map-viewport">
+          <div className="harbor-map material-harbor-map" style={mapStyle}>
+          <span className="map-watermark">雾港港务局 / 2019 港区调查图</span>
+          {mapHotspots.map((location) => {
+            const unlocked = !location.unlockAfter || completed.includes(location.unlockAfter);
+            const isTask = taskLocation === location.id;
+            return <button ref={(node) => { hotspotRefs.current[location.id] = node; }} type="button" key={location.id} className={`${selected.id === location.id ? "is-selected" : ""} ${unlocked ? "is-unlocked" : "is-locked"} ${isTask ? "is-current-task" : ""}`} style={{ left: `${location.x}%`, top: `${location.y}%` }} onClick={() => setSelectedId(location.id)} aria-label={`${unlocked ? "查看地点" : "查看未恢复地点轮廓"}：${location.name}`} data-locked={!unlocked || undefined}><MapPin size={17} /><span>{location.name}</span>{!unlocked && <LockKeyhole size={12} className="map-hotspot-lock" aria-hidden="true" />}</button>;
+          })}
+          <div className="map-truth-legend" aria-hidden="true"><span>当前目标</span><span>已确认地点</span><span>待恢复索引</span></div>
+          </div>
         </div>
-        <aside className="map-note"><p className="eyebrow">LOCATION / {selected.kind}</p><h3>{selected.name}</h3><p>{selected.description}</p><div>{selected.linkedEvidence.map((id) => <span key={id}>{id.replace("ev-", "E/")}</span>)}</div></aside>
+        <aside className={`map-note material-map-note ${selectedUnlocked ? "" : "is-locked"}`}><p className="eyebrow">LOCATION / {selected.kind}</p><h3>{selected.name}</h3>{selectedUnlocked ? <><p>{selected.description}</p><div>{selected.linkedEvidence.map((id) => <span key={id}>{id.replace("ev-", "E/")}</span>)}</div></> : <p>照片索引尚未恢复。目前只能确认这里存在一条被封锁的港务通道。</p>}{taskLocation === selected.id && <strong className="map-task-badge">当前调查目标</strong>}</aside>
       </div>
-      {completed.includes("deduction") && anonymous && <HiddenPuzzle />}
-      {completed.includes("deduction") && !anonymous && <div className="locked-inline"><ShieldQuestion size={17} /><span>地图背面有潮湿压痕，但系统要求先确认匿名委托人的身份。</span></div>}
+      <div id="hidden-index" ref={hiddenIndexRef} tabIndex={-1}>{completed.includes("deduction") && anonymous && <HiddenPuzzle />}{completed.includes("deduction") && !anonymous && <div className="locked-inline"><ShieldQuestion size={17} /><span>地图背面有潮湿压痕，但系统要求先确认匿名委托人的身份。</span></div>}</div>
     </WindowFrame>
   );
 }
@@ -55,14 +123,27 @@ export function InboxWindow() {
   const code = useCaseStore((state) => state.investigatorCode);
   const readIds = useCaseStore((state) => state.readMessageIds);
   const markRead = useCaseStore((state) => state.markMessageRead);
+  const intent = useWindowStore((state) => state.pendingIntents.inbox);
+  const consumeIntent = useWindowStore((state) => state.consumeIntent);
   const available = useMemo(() => messages.filter((message) => !message.unlockAfter || completed.includes(message.unlockAfter)), [completed]);
-  const [selectedId, setSelectedId] = useState("msg-commission");
+  const [initialIntent] = useState(() => useWindowStore.getState().pendingIntents.inbox);
+  const [selectedId, setSelectedId] = useState(() => available.some((message) => message.id === initialIntent?.focusId) ? initialIntent!.focusId! : "msg-commission");
   const selected = available.find((message) => message.id === selectedId) ?? available[0];
   const open = (id: string) => { setSelectedId(id); markRead(id); };
+  useEffect(() => {
+    if (selected) markRead(selected.id);
+  }, [markRead, selected]);
+  useEffect(() => {
+    if (!intent) return;
+    const frame = window.requestAnimationFrame(() => {
+      if (intent.focusId && available.some((message) => message.id === intent.focusId)) setSelectedId(intent.focusId);
+      consumeIntent("inbox", intent.serial);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [available, consumeIntent, intent]);
   return (
     <WindowFrame id="inbox" title="离线收件箱" index={`I-${available.length.toString().padStart(2, "0")}`} className="medium-window">
       <div className="inbox-layout"><aside className="message-list"><header><strong>本地消息</strong><span>{available.filter((item) => !readIds.includes(item.id)).length} 未读</span></header>{available.map((message) => <button type="button" key={message.id} className={`${selected?.id === message.id ? "is-selected" : ""} ${readIds.includes(message.id) ? "is-read" : ""}`} onClick={() => open(message.id)}><MailOpen size={15} /><span><strong>{message.from}</strong><small>{message.subject}</small></span><time>{message.time}</time></button>)}</aside>{selected && <article className="message-reader"><p className="eyebrow">OFFLINE MESSAGE / {selected.time}</p><h2>{selected.subject}</h2><p className="message-from">来自：{selected.from}　→　调查员 {code}</p>{selected.body.map((paragraph) => <p key={paragraph}>{paragraph.replaceAll("{{code}}", code)}</p>)}<footer>此消息保存在本地备份节点，来源不可验证。</footer></article>}</div>
     </WindowFrame>
   );
 }
-

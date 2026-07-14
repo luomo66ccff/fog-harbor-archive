@@ -1,34 +1,88 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { AlertTriangle, CassetteTape, Check, Eraser, FileAudio, RotateCcw, Save, Volume2, VolumeX } from "lucide-react";
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
+import { AlertTriangle, CassetteTape, Check, Contrast, Eraser, FileAudio, Pause, Play, RotateCcw, Save, ScanLine, SunMedium, Volume2, VolumeX } from "lucide-react";
 import { FrequencyPuzzle } from "@/components/puzzles/FrequencyPuzzle";
 import { PhotoPuzzle } from "@/components/puzzles/PhotoPuzzle";
 import { WindowFrame } from "@/components/windows/WindowFrame";
 import { audioRecords } from "@/lib/case-data";
+import { visualAssets } from "@/lib/visual-assets";
 import { useCaseStore } from "@/store/case-store";
 import { useWindowStore } from "@/store/window-store";
 
 export function AudioWindow() {
   const completed = useCaseStore((state) => state.completedPuzzles);
-  const [tab, setTab] = useState<"analyze" | "transcripts">("analyze");
+  const intent = useWindowStore((state) => state.pendingIntents.audio);
+  const consumeIntent = useWindowStore((state) => state.consumeIntent);
   const available = useMemo(() => audioRecords.filter((record) => !record.unlockAfter || completed.includes(record.unlockAfter)), [completed]);
-  const [selectedId, setSelectedId] = useState("audio-call");
+  const [initialIntent] = useState(() => useWindowStore.getState().pendingIntents.audio);
+  const [tab, setTab] = useState<"analyze" | "transcripts">(initialIntent?.tab === "transcripts" || initialIntent?.focusId ? "transcripts" : "analyze");
+  const [selectedId, setSelectedId] = useState(() => available.some((record) => record.id === initialIntent?.focusId) ? initialIntent!.focusId! : "audio-call");
   const selected = available.find((record) => record.id === selectedId) ?? available[0];
+  useEffect(() => {
+    if (!intent) return;
+    const frame = window.requestAnimationFrame(() => {
+      if (intent.tab === "analyze" || intent.tab === "transcripts") setTab(intent.tab);
+      if (intent.focusId && available.some((record) => record.id === intent.focusId)) {
+        setSelectedId(intent.focusId);
+        setTab("transcripts");
+      }
+      consumeIntent("audio", intent.serial);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [available, consumeIntent, intent]);
   return (
     <WindowFrame id="audio" title="录音带修复台" index="R-03" className="wide-window">
       <div className="window-tabs"><button type="button" className={tab === "analyze" ? "is-active" : ""} onClick={() => setTab("analyze")}><CassetteTape size={14} /> 频率分析 {completed.includes("frequency") && <Check size={13} />}</button><button type="button" className={tab === "transcripts" ? "is-active" : ""} onClick={() => setTab("transcripts")}><FileAudio size={14} /> 视觉辅助文本 ({available.length})</button></div>
-      {tab === "analyze" ? <FrequencyPuzzle /> : <div className="audio-archive"><aside>{available.map((record) => <button type="button" key={record.id} className={selected?.id === record.id ? "is-selected" : ""} onClick={() => setSelectedId(record.id)}><span>{record.duration}</span><strong>{record.title}</strong><small>{record.source}</small></button>)}</aside>{selected && <article><p className="eyebrow">ACCESSIBLE TRANSCRIPT</p><h2>{selected.title}</h2><p>来源：{selected.source}　/　长度：{selected.duration}</p><div className="transcript-lines">{selected.transcript.map((line) => <p key={line}>{line}</p>)}</div><footer>音频不可用或关闭时，本转写提供完整的等价解谜信息。</footer></article>}</div>}
+      {tab === "analyze" ? <div className="audio-machine-shell"><div className="audio-machine-header"><span>MGPA / 纸带修复工作台</span><strong>纸带 A · 2019.07.12</strong><small>图像仅为机柜材质；参数、波形与口令以下方交互控制台为准</small></div><div className="audio-machine-interaction"><FrequencyPuzzle /></div></div> : <div className="audio-archive"><aside>{available.map((record) => <button type="button" key={record.id} className={selected?.id === record.id ? "is-selected" : ""} onClick={() => setSelectedId(record.id)}><span>{record.duration}</span><strong>{record.title}</strong><small>{record.source}</small></button>)}</aside>{selected && <article><p className="eyebrow">ACCESSIBLE TRANSCRIPT</p><h2>{selected.title}</h2><p>来源：{selected.source}　/　长度：{selected.duration}</p><div className="transcript-lines">{selected.transcript.map((line) => <p key={line}>{line}</p>)}</div><footer>音频不可用或关闭时，本转写提供完整的等价解谜信息。</footer></article>}</div>}
     </WindowFrame>
   );
 }
 
 export function SurveillanceWindow() {
   const solved = useCaseStore((state) => state.completedPuzzles.includes("photo"));
+  const [channel, setChannel] = useState("C-07");
+  const [brightness, setBrightness] = useState(94);
+  const [contrast, setContrast] = useState(108);
+  const [frozen, setFrozen] = useState(false);
+  const workbenchRef = useRef<HTMLDivElement>(null);
+
+  const openWorkbench = () => {
+    setChannel("C-07");
+    window.requestAnimationFrame(() => {
+      const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      workbenchRef.current?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+      workbenchRef.current?.querySelector<HTMLElement>("button, input, select")?.focus({ preventScroll: true });
+    });
+  };
+
+  const roomImageStyle: CSSProperties = {
+    backgroundImage: `url(${visualAssets.surveillanceRoom})`,
+    filter: `brightness(${brightness}%) contrast(${contrast}%)`,
+  };
+  const sideChannels = [
+    { id: "C-02", label: "北闸", style: { left: "3.2%", top: "7%", width: "18.5%", height: "24%" } },
+    { id: "C-03", label: "仓栈", style: { left: "3.2%", top: "35%", width: "18.5%", height: "23%" } },
+    { id: "C-04", label: "下层", style: { left: "3.2%", top: "62%", width: "18.5%", height: "22%" } },
+    { id: "C-08", label: "外闸", style: { right: "3.2%", top: "7%", width: "18.5%", height: "24%" } },
+    { id: "C-09", label: "水线", style: { right: "3.2%", top: "35%", width: "18.5%", height: "23%" } },
+    { id: "C-12", label: "检修梯", style: { right: "3.2%", top: "62%", width: "18.5%", height: "22%" } },
+  ];
   return (
     <WindowFrame id="surveillance" title="监控室 / CCTV-7" index="C-07" className="wide-window">
-      <div className="cctv-status"><span className="record-dot" /> CHANNEL 07 / ARCHIVE FRAME / SYSTEM +11 MIN</div>
-      <PhotoPuzzle />
+      <div className="cctv-status"><span className="record-dot" /> 2019.07.12 / CHANNEL {channel.replace("C-", "")} / 档案帧 / 系统偏移 +11 分钟</div>
+      <section className={`surveillance-room-shell ${frozen ? "is-frozen" : ""}`} aria-label="监控室频道选择与画面校准">
+        <div className="surveillance-room-image" style={roomImageStyle} aria-hidden="true" />
+        {sideChannels.map((item) => <button type="button" key={item.id} className={`surveillance-screen-hotspot ${channel === item.id ? "is-selected" : ""}`} style={item.style} onClick={() => setChannel(item.id)} aria-pressed={channel === item.id}><span>{item.id}</span><strong>{item.label}</strong><small>{item.id === "C-12" && solved ? "已恢复" : "只读帧"}</small></button>)}
+        <button type="button" className={`surveillance-primary-screen ${channel === "C-07" ? "is-selected" : ""}`} onClick={openWorkbench} aria-label="打开七号码头密封照片工作台"><span>中央 CRT / C-07</span><strong>第七码头密封照片</strong><small>2019.07.12　00:42 系统叠字</small><em><ScanLine size={15} /> 打开扫描工作台</em></button>
+        <div className="surveillance-date-mask" aria-label="剧情录像时间"><span>MGPA ARCHIVE</span><strong>2019.07.12 / 00:42</strong></div>
+      </section>
+      <div className="surveillance-controls">
+        <label><span><SunMedium size={15} /> 亮度 <output>{brightness}%</output></span><input type="range" min="72" max="118" value={brightness} onChange={(event) => setBrightness(Number(event.target.value))} /></label>
+        <label><span><Contrast size={15} /> 对比度 <output>{contrast}%</output></span><input type="range" min="82" max="132" value={contrast} onChange={(event) => setContrast(Number(event.target.value))} /></label>
+        <button type="button" className={frozen ? "is-active" : ""} onClick={() => setFrozen((value) => !value)} aria-pressed={frozen}>{frozen ? <Play size={15} /> : <Pause size={15} />}{frozen ? "恢复画面" : "冻结帧"}</button>
+      </div>
+      <div className="surveillance-workbench" ref={workbenchRef} tabIndex={-1}><header><span>损坏扫描仪 / PHOTO PACKET 07</span><strong>交互数据与验证结果以下方工作台为准</strong></header><PhotoPuzzle /></div>
       {solved && <div className="frame-comparison"><article><span>系统叠字</span><strong>00:42</strong><p>来自被校准后的录像时间。</p></article><i aria-hidden="true">≠</i><article><span>岸钟倒影</span><strong>00:31</strong><p>机械岸钟不受系统校时影响。</p></article></div>}
     </WindowFrame>
   );
@@ -75,4 +129,3 @@ export function SettingsWindow({ onLeave }: { onLeave: () => void }) {
     </WindowFrame>
   );
 }
-

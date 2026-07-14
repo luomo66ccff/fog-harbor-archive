@@ -6,6 +6,7 @@ import { useFogAudio } from "@/components/audio/AudioProvider";
 import { HiddenPuzzle } from "@/components/puzzles/HiddenPuzzle";
 import { WindowFrame } from "@/components/windows/WindowFrame";
 import { archiveDocuments, endings } from "@/lib/case-data";
+import { getVerifiedEvidenceIds } from "@/lib/evidence-engine";
 import { getEndingAvailability } from "@/lib/ending-engine";
 import { useCaseStore } from "@/store/case-store";
 import type { EndingId } from "@/types/case";
@@ -19,7 +20,10 @@ const candidates = [
 export function FinaleWindow() {
   const completed = useCaseStore((state) => state.completedPuzzles);
   const unlockedEvidenceIds = useCaseStore((state) => state.unlockedEvidenceIds);
-  const readEvidenceIds = useCaseStore((state) => state.readEvidenceIds);
+  const verdicts = useCaseStore((state) => state.evidenceVerdicts);
+  const relations = useCaseStore((state) => state.evidenceRelations);
+  const touchedIds = useCaseStore((state) => state.evidenceReviewTouchedIds);
+  const legacyVerifiedIds = useCaseStore((state) => state.legacyVerifiedEvidenceIds);
   const anonymous = useCaseStore((state) => state.discoveredAnonymous);
   const code = useCaseStore((state) => state.investigatorCode);
   const identifyAnonymous = useCaseStore((state) => state.identifyAnonymous);
@@ -36,7 +40,14 @@ export function FinaleWindow() {
     markEvidenceRead("ev-final-chain");
   }, [markDocumentRead, markEvidenceRead]);
 
-  const context = useMemo(() => ({ completedPuzzles: completed, unlockedEvidenceIds, readEvidenceIds, discoveredAnonymous: anonymous }), [anonymous, completed, readEvidenceIds, unlockedEvidenceIds]);
+  const verifiedEvidenceIds = useMemo(() => getVerifiedEvidenceIds({
+    visibleEvidenceIds: unlockedEvidenceIds,
+    legacyVerifiedEvidenceIds: legacyVerifiedIds,
+    touchedEvidenceIds: touchedIds,
+    verdicts,
+    relations,
+  }), [legacyVerifiedIds, relations, touchedIds, unlockedEvidenceIds, verdicts]);
+  const context = useMemo(() => ({ completedPuzzles: completed, unlockedEvidenceIds, readEvidenceIds: verifiedEvidenceIds, discoveredAnonymous: anonymous }), [anonymous, completed, unlockedEvidenceIds, verifiedEvidenceIds]);
   const availability = getEndingAvailability(context);
 
   const verifyIdentity = () => {
@@ -85,4 +96,3 @@ export function FinaleWindow() {
     </WindowFrame>
   );
 }
-

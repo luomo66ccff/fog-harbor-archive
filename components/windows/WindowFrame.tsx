@@ -1,12 +1,47 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { motion, useDragControls } from "framer-motion";
+import { motion, useDragControls, useReducedMotion } from "framer-motion";
 import { Minus, X } from "lucide-react";
 import { useWindowStore } from "@/store/window-store";
 import type { WindowId } from "@/types/case";
 
-export function WindowFrame({ id, title, index, children, className = "" }: { id: WindowId; title: string; index: string; children: React.ReactNode; className?: string }) {
+export type WindowVariant = "paper" | "terminal" | "metal" | "crt" | "cork" | "map" | "final";
+
+const defaultWindowVariant: Record<WindowId, WindowVariant> = {
+  archive: "paper",
+  people: "paper",
+  map: "map",
+  timeline: "terminal",
+  inbox: "terminal",
+  audio: "metal",
+  surveillance: "crt",
+  evidence: "cork",
+  notes: "paper",
+  settings: "terminal",
+  finale: "final",
+};
+
+const motionByVariant: Record<WindowVariant, { initial: { opacity: number; y?: number; scale?: number; rotate?: number }; exit: { opacity: number; y?: number; scale?: number } }> = {
+  paper: { initial: { opacity: 0, y: 14, rotate: -0.35 }, exit: { opacity: 0, y: 8 } },
+  terminal: { initial: { opacity: 0, y: 6, scale: 0.992 }, exit: { opacity: 0, scale: 0.996 } },
+  metal: { initial: { opacity: 0, y: 12, scale: 0.995 }, exit: { opacity: 0, y: 7 } },
+  crt: { initial: { opacity: 0, scale: 0.985 }, exit: { opacity: 0, scale: 0.992 } },
+  cork: { initial: { opacity: 0, y: 12, rotate: 0.2 }, exit: { opacity: 0, y: 8 } },
+  map: { initial: { opacity: 0, y: 16, rotate: -0.2 }, exit: { opacity: 0, y: 9 } },
+  final: { initial: { opacity: 0, y: 18, scale: 0.99 }, exit: { opacity: 0, y: 10 } },
+};
+
+interface WindowFrameProps {
+  id: WindowId;
+  title: string;
+  index: string;
+  children: React.ReactNode;
+  className?: string;
+  variant?: WindowVariant;
+}
+
+export function WindowFrame({ id, title, index, children, className = "", variant = defaultWindowVariant[id] }: WindowFrameProps) {
   const activeWindow = useWindowStore((state) => state.activeWindow);
   const minimized = useWindowStore((state) => state.minimized.includes(id));
   const zIndex = useWindowStore((state) => state.zOrder[id] ?? 120);
@@ -14,6 +49,7 @@ export function WindowFrame({ id, title, index, children, className = "" }: { id
   const minimizeWindow = useWindowStore((state) => state.minimizeWindow);
   const focusWindow = useWindowStore((state) => state.focusWindow);
   const dragControls = useDragControls();
+  const reduceMotion = useReducedMotion();
   const windowRef = useRef<HTMLElement>(null);
   const [mobile, setMobile] = useState(false);
 
@@ -36,13 +72,15 @@ export function WindowFrame({ id, title, index, children, className = "" }: { id
   };
 
   if (minimized) return null;
+  const motionPreset = motionByVariant[variant];
   return (
     <motion.section
       ref={windowRef}
-      className={`case-window window-${id} ${activeWindow === id ? "is-active" : ""} ${mobile && activeWindow !== id ? "is-mobile-hidden" : ""} ${className}`}
-      style={{ zIndex }} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 6 }}
+      className={`case-window window-${id} window-variant-${variant} ${activeWindow === id ? "is-active" : ""} ${mobile && activeWindow !== id ? "is-mobile-hidden" : ""} ${className}`}
+      data-window-variant={variant}
+      style={{ zIndex }} initial={reduceMotion ? { opacity: 0 } : motionPreset.initial} animate={{ opacity: 1, y: 0, scale: 1, rotate: 0 }} exit={reduceMotion ? { opacity: 0 } : motionPreset.exit}
       drag={!mobile} dragListener={false} dragControls={dragControls} dragMomentum={false} dragConstraints={{ left: -260, right: 260, top: -120, bottom: 170 }} dragElastic={0.04}
-      onPointerDown={() => focusWindow(id)} role="region" aria-labelledby={`${id}-window-title`} tabIndex={-1}
+      onPointerDown={() => focusWindow(id)} role="region" aria-labelledby={`${id}-window-title`} aria-hidden={mobile && activeWindow !== id} tabIndex={-1}
     >
       <header
         className="window-handle"

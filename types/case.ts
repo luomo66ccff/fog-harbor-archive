@@ -15,6 +15,51 @@ export type PuzzleId = "schedule" | "frequency" | "photo" | "deduction" | "hidde
 
 export type EndingId = "truth" | "trade" | "seventh";
 
+export type InvestigationTaskId =
+  | "restore-time"
+  | "repair-call"
+  | "reconstruct-photo"
+  | "close-chain"
+  | "review-finale";
+
+export type UnlockEventId = PuzzleId | "anonymous";
+
+export type WindowTab =
+  | "documents"
+  | "schedule"
+  | "analyze"
+  | "transcripts"
+  | "board"
+  | "deduction";
+
+export interface WindowNavigationOptions {
+  tab?: WindowTab;
+  focusId?: string;
+}
+
+export interface WindowNavigationTarget extends WindowNavigationOptions {
+  windowId: WindowId;
+}
+
+export interface WindowNavigationIntent extends WindowNavigationOptions {
+  serial: number;
+}
+
+export type TaskProgress = Partial<Record<InvestigationTaskId, string[]>>;
+
+export interface InvestigationTask {
+  id: InvestigationTaskId;
+  title: string;
+  description: string;
+  targetWindow: WindowId;
+  targetTab?: WindowTab;
+  targetFocusId?: string;
+  puzzleId?: PuzzleId;
+  progressLabel?: string;
+  completed: boolean;
+  hintLevels: readonly string[];
+}
+
 export interface Person {
   id: string;
   name: string;
@@ -87,4 +132,3 @@ export interface CaseEnding {
   title: string;
   body: string[];
 }
-

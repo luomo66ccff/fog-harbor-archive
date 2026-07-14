@@ -2,9 +2,15 @@
 
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import type { EndingId, PuzzleId } from "@/types/case";
-import type { EvidenceVerdict } from "@/types/evidence";
-import { initialEvidenceIds, puzzleRewards } from "@/lib/evidence-data";
+import type {
+  EndingId,
+  InvestigationTaskId,
+  PuzzleId,
+  TaskProgress,
+  UnlockEventId,
+} from "@/types/case";
+import type { EvidenceRelationKind, EvidenceRelations, EvidenceVerdict } from "@/types/evidence";
+import { evidence, initialEvidenceIds, puzzleRewards } from "@/lib/evidence-data";
 
 export const SAVE_KEY = "fog-harbor-save-v1";
 
@@ -28,13 +34,19 @@ interface CaseState {
   readEvidenceIds: string[];
   evidenceVerdicts: Record<string, EvidenceVerdict>;
   evidenceNotes: Record<string, string>;
+  evidenceRelations: EvidenceRelations;
+  evidenceReviewTouchedIds: string[];
+  legacyVerifiedEvidenceIds: string[];
   caseNote: string;
   discoveredAnonymous: boolean;
   currentEnding: EndingId | null;
   endingsSeen: EndingId[];
   puzzleAttempts: Partial<Record<PuzzleId, number>>;
+  taskProgress: TaskProgress;
   audio: AudioSettings;
   soundDegraded: boolean;
+  unlockQueue: UnlockEventId[];
+  /** @deprecated Read unlockQueue instead. Kept until the desktop toast is migrated. */
   lastUnlock: string | null;
   setHydrated: (value: boolean) => void;
   setInvestigatorCode: (code: string) => void;
@@ -43,13 +55,16 @@ interface CaseState {
   markMessageRead: (id: string) => void;
   markEvidenceRead: (id: string) => void;
   setEvidenceVerdict: (id: string, verdict: EvidenceVerdict) => void;
+  toggleEvidenceRelation: (id: string, relatedId: string, relation: EvidenceRelationKind) => void;
   setEvidenceNote: (id: string, note: string) => void;
   setCaseNote: (note: string) => void;
   recordAttempt: (id: PuzzleId) => void;
+  markTaskProgress: (taskId: InvestigationTaskId, itemId: string) => void;
   completePuzzle: (id: PuzzleId) => void;
   identifyAnonymous: () => void;
   chooseEnding: (id: EndingId) => void;
   dismissUnlock: () => void;
+  dismissUnlockNotification: (id?: UnlockEventId) => void;
   updateAudio: (settings: Partial<AudioSettings>) => void;
   setSoundDegraded: (value: boolean) => void;
   restartCase: () => void;
@@ -69,11 +84,15 @@ export type PersistedCaseState = Pick<
   | "readEvidenceIds"
   | "evidenceVerdicts"
   | "evidenceNotes"
+  | "evidenceRelations"
+  | "evidenceReviewTouchedIds"
+  | "legacyVerifiedEvidenceIds"
   | "caseNote"
   | "discoveredAnonymous"
   | "currentEnding"
   | "endingsSeen"
   | "puzzleAttempts"
+  | "taskProgress"
   | "audio"
   | "soundDegraded"
 >;
@@ -81,6 +100,14 @@ export type PersistedCaseState = Pick<
 const puzzleIds = new Set<PuzzleId>(["schedule", "frequency", "photo", "deduction", "hidden"]);
 const endingIds = new Set<EndingId>(["truth", "trade", "seventh"]);
 const evidenceVerdicts = new Set<EvidenceVerdict>(["unmarked", "credible", "doubtful", "forged"]);
+const criticalEvidenceIds = new Set(evidence.filter((item) => item.critical).map((item) => item.id));
+const investigationTaskIds = new Set<InvestigationTaskId>([
+  "restore-time",
+  "repair-call",
+  "reconstruct-photo",
+  "close-chain",
+  "review-finale",
+]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -94,7 +121,7 @@ function isEndingId(value: unknown): value is EndingId {
   return typeof value === "string" && endingIds.has(value as EndingId);
 }
 
-function stringArrayOr(value: unknown, fallback: string[]): string[] {
+function stringArrayOr(value: unknown, fallback: string[] = []): string[] {
   return Array.isArray(value) && value.every((item) => typeof item === "string")
     ? unique(value)
     : [...fallback];
@@ -124,6 +151,31 @@ function stringRecordOr(value: unknown, fallback: Record<string, string>): Recor
   return Object.fromEntries(Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
 }
 
+function evidenceRelationsOr(value: unknown, fallback: EvidenceRelations = {}): EvidenceRelations {
+  if (!isRecord(value)) return structuredCloneRelations(fallback);
+  const relations: EvidenceRelations = {};
+  for (const [evidenceId, selection] of Object.entries(value)) {
+    if (!isRecord(selection)) continue;
+    const supports = Array.isArray(selection.supports) && selection.supports.every((id) => typeof id === "string")
+      ? unique(selection.supports.filter((id) => id !== evidenceId))
+      : [];
+    const contradicts = Array.isArray(selection.contradicts) && selection.contradicts.every((id) => typeof id === "string")
+      ? unique(selection.contradicts.filter((id) => id !== evidenceId && !supports.includes(id)))
+      : [];
+    relations[evidenceId] = { supports, contradicts };
+  }
+  return relations;
+}
+
+function structuredCloneRelations(relations: EvidenceRelations = {}): EvidenceRelations {
+  return Object.fromEntries(
+    Object.entries(relations).map(([id, selection]) => [id, {
+      supports: [...selection.supports],
+      contradicts: [...selection.contradicts],
+    }]),
+  );
+}
+
 function puzzleAttemptsOr(
   value: unknown,
   fallback: Partial<Record<PuzzleId, number>>,
@@ -134,6 +186,24 @@ function puzzleAttemptsOr(
     if (isPuzzleId(key) && typeof count === "number" && Number.isInteger(count) && count >= 0) attempts[key] = count;
   }
   return attempts;
+}
+
+function cloneTaskProgress(progress: TaskProgress | undefined): TaskProgress {
+  if (!progress) return {};
+  return Object.fromEntries(
+    Object.entries(progress).map(([taskId, itemIds]) => [taskId, [...(itemIds ?? [])]]),
+  ) as TaskProgress;
+}
+
+function taskProgressOr(value: unknown, fallback?: TaskProgress): TaskProgress {
+  if (!isRecord(value)) return cloneTaskProgress(fallback);
+  const progress: TaskProgress = {};
+  for (const [taskId, itemIds] of Object.entries(value)) {
+    if (!investigationTaskIds.has(taskId as InvestigationTaskId)) continue;
+    if (!Array.isArray(itemIds) || !itemIds.every((item) => typeof item === "string")) continue;
+    progress[taskId as InvestigationTaskId] = unique(itemIds);
+  }
+  return progress;
 }
 
 function audioSettingsOr(value: unknown, fallback: AudioSettings): AudioSettings {
@@ -161,11 +231,15 @@ function persistedSnapshot(state: CaseState): PersistedCaseState {
     readEvidenceIds: state.readEvidenceIds,
     evidenceVerdicts: state.evidenceVerdicts,
     evidenceNotes: state.evidenceNotes,
+    evidenceRelations: state.evidenceRelations,
+    evidenceReviewTouchedIds: state.evidenceReviewTouchedIds,
+    legacyVerifiedEvidenceIds: state.legacyVerifiedEvidenceIds,
     caseNote: state.caseNote,
     discoveredAnonymous: state.discoveredAnonymous,
     currentEnding: state.currentEnding,
     endingsSeen: state.endingsSeen,
     puzzleAttempts: state.puzzleAttempts,
+    taskProgress: state.taskProgress,
     audio: state.audio,
     soundDegraded: state.soundDegraded,
   };
@@ -176,6 +250,10 @@ export function sanitizePersistedCaseState(
   fallback: PersistedCaseState,
 ): PersistedCaseState {
   const source = isRecord(persistedState) ? persistedState : {};
+  const readEvidenceIds = stringArrayOr(source.readEvidenceIds, fallback.readEvidenceIds);
+  const hasReviewState = Object.prototype.hasOwnProperty.call(source, "evidenceReviewTouchedIds")
+    || Object.prototype.hasOwnProperty.call(source, "legacyVerifiedEvidenceIds")
+    || Object.prototype.hasOwnProperty.call(source, "evidenceRelations");
   return {
     investigatorCode: typeof source.investigatorCode === "string"
       ? source.investigatorCode.trim().slice(0, 18)
@@ -191,14 +269,20 @@ export function sanitizePersistedCaseState(
     unlockedEvidenceIds: stringArrayOr(source.unlockedEvidenceIds, fallback.unlockedEvidenceIds),
     readDocumentIds: stringArrayOr(source.readDocumentIds, fallback.readDocumentIds),
     readMessageIds: stringArrayOr(source.readMessageIds, fallback.readMessageIds),
-    readEvidenceIds: stringArrayOr(source.readEvidenceIds, fallback.readEvidenceIds),
+    readEvidenceIds,
     evidenceVerdicts: verdictRecordOr(source.evidenceVerdicts, fallback.evidenceVerdicts),
     evidenceNotes: stringRecordOr(source.evidenceNotes, fallback.evidenceNotes),
+    evidenceRelations: evidenceRelationsOr(source.evidenceRelations, fallback.evidenceRelations),
+    evidenceReviewTouchedIds: stringArrayOr(source.evidenceReviewTouchedIds, fallback.evidenceReviewTouchedIds),
+    legacyVerifiedEvidenceIds: hasReviewState
+      ? stringArrayOr(source.legacyVerifiedEvidenceIds, fallback.legacyVerifiedEvidenceIds)
+      : readEvidenceIds.filter((id) => criticalEvidenceIds.has(id)),
     caseNote: typeof source.caseNote === "string" ? source.caseNote : fallback.caseNote,
     discoveredAnonymous: typeof source.discoveredAnonymous === "boolean" ? source.discoveredAnonymous : fallback.discoveredAnonymous,
     currentEnding: source.currentEnding === null || isEndingId(source.currentEnding) ? source.currentEnding : fallback.currentEnding,
     endingsSeen: endingArrayOr(source.endingsSeen, fallback.endingsSeen),
     puzzleAttempts: puzzleAttemptsOr(source.puzzleAttempts, fallback.puzzleAttempts),
+    taskProgress: taskProgressOr(source.taskProgress, fallback.taskProgress),
     audio: audioSettingsOr(source.audio, fallback.audio),
     soundDegraded: typeof source.soundDegraded === "boolean" ? source.soundDegraded : fallback.soundDegraded,
   };
@@ -212,10 +296,15 @@ const freshProgress = {
   readEvidenceIds: [] as string[],
   evidenceVerdicts: {} as Record<string, EvidenceVerdict>,
   evidenceNotes: {} as Record<string, string>,
+  evidenceRelations: {} as EvidenceRelations,
+  evidenceReviewTouchedIds: [] as string[],
+  legacyVerifiedEvidenceIds: [] as string[],
   caseNote: "",
   discoveredAnonymous: false,
   currentEnding: null as EndingId | null,
   puzzleAttempts: {} as Partial<Record<PuzzleId, number>>,
+  taskProgress: {} as TaskProgress,
+  unlockQueue: [] as UnlockEventId[],
   lastUnlock: null as string | null,
 };
 
@@ -241,30 +330,76 @@ export const useCaseStore = create<CaseState>()(
       markDocumentRead: (id) => set((state) => ({ readDocumentIds: unique([...state.readDocumentIds, id]) })),
       markMessageRead: (id) => set((state) => ({ readMessageIds: unique([...state.readMessageIds, id]) })),
       markEvidenceRead: (id) => set((state) => ({ readEvidenceIds: unique([...state.readEvidenceIds, id]) })),
-      setEvidenceVerdict: (id, verdict) => set((state) => ({ evidenceVerdicts: { ...state.evidenceVerdicts, [id]: verdict } })),
+      setEvidenceVerdict: (id, verdict) => set((state) => ({
+        evidenceVerdicts: { ...state.evidenceVerdicts, [id]: verdict },
+        evidenceReviewTouchedIds: unique([...state.evidenceReviewTouchedIds, id]),
+        legacyVerifiedEvidenceIds: state.legacyVerifiedEvidenceIds.filter((item) => item !== id),
+      })),
+      toggleEvidenceRelation: (id, relatedId, relation) => {
+        if (!id || !relatedId || id === relatedId) return;
+        set((state) => {
+          const current = state.evidenceRelations[id] ?? { supports: [], contradicts: [] };
+          const otherRelation = relation === "supports" ? "contradicts" : "supports";
+          const selected = current[relation].includes(relatedId);
+          return {
+            evidenceRelations: {
+              ...state.evidenceRelations,
+              [id]: {
+                ...current,
+                [relation]: selected
+                  ? current[relation].filter((item) => item !== relatedId)
+                  : unique([...current[relation], relatedId]),
+                [otherRelation]: current[otherRelation].filter((item) => item !== relatedId),
+              },
+            },
+            evidenceReviewTouchedIds: unique([...state.evidenceReviewTouchedIds, id]),
+            legacyVerifiedEvidenceIds: state.legacyVerifiedEvidenceIds.filter((item) => item !== id),
+          };
+        });
+      },
       setEvidenceNote: (id, note) => set((state) => ({ evidenceNotes: { ...state.evidenceNotes, [id]: note } })),
       setCaseNote: (caseNote) => set({ caseNote }),
       recordAttempt: (id) => set((state) => ({ puzzleAttempts: { ...state.puzzleAttempts, [id]: (state.puzzleAttempts[id] ?? 0) + 1 } })),
+      markTaskProgress: (taskId, itemId) => {
+        const normalizedId = itemId.trim();
+        if (!normalizedId) return;
+        set((state) => ({
+          taskProgress: {
+            ...state.taskProgress,
+            [taskId]: unique([...(state.taskProgress[taskId] ?? []), normalizedId]),
+          },
+        }));
+      },
       completePuzzle: (id) => {
         if (get().completedPuzzles.includes(id)) return;
         const rewards = puzzleRewards[id] ?? [];
         set((state) => ({
           completedPuzzles: [...state.completedPuzzles, id],
           unlockedEvidenceIds: unique([...state.unlockedEvidenceIds, ...rewards]),
+          unlockQueue: [...state.unlockQueue, id],
           lastUnlock: id,
         }));
       },
-      identifyAnonymous: () => set((state) => ({
-        discoveredAnonymous: true,
-        unlockedEvidenceIds: unique([...state.unlockedEvidenceIds, "ev-voiceprint"]),
-        lastUnlock: "anonymous",
-      })),
+      identifyAnonymous: () => {
+        if (get().discoveredAnonymous) return;
+        set((state) => ({
+          discoveredAnonymous: true,
+          unlockedEvidenceIds: unique([...state.unlockedEvidenceIds, "ev-voiceprint"]),
+          unlockQueue: [...state.unlockQueue, "anonymous"],
+          lastUnlock: "anonymous",
+        }));
+      },
       chooseEnding: (id) => set((state) => ({
         currentEnding: id,
         completedRuns: state.currentEnding ? state.completedRuns : state.completedRuns + 1,
         endingsSeen: unique([...state.endingsSeen, id]) as EndingId[],
       })),
       dismissUnlock: () => set({ lastUnlock: null }),
+      dismissUnlockNotification: (id) => set((state) => {
+        const current = state.unlockQueue[0];
+        if (!current || (id && current !== id)) return state;
+        return { unlockQueue: state.unlockQueue.slice(1) };
+      }),
       updateAudio: (settings) => set((state) => ({ audio: { ...state.audio, ...settings } })),
       setSoundDegraded: (value) => set({ soundDegraded: value }),
       restartCase: () => set((state) => ({

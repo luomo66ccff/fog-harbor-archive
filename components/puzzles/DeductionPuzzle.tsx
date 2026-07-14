@@ -1,10 +1,11 @@
 "use client";
 
 import { DragEvent, useMemo, useState } from "react";
-import { Check, Link2, Search, X } from "lucide-react";
+import { Check, Link2, Paperclip, Search, ShieldAlert, X } from "lucide-react";
 import { useFogAudio } from "@/components/audio/AudioProvider";
 import { puzzleGuidance } from "@/lib/case-data";
-import { deductionAnswer, deductionSlots, isDeductionSolved } from "@/lib/puzzle-engine";
+import { evidenceTitle, deductionEvidenceRequirements, evaluateDeductionSubmission, getVerifiedEvidenceIds } from "@/lib/evidence-engine";
+import { deductionSlots } from "@/lib/puzzle-engine";
 import { useCaseStore } from "@/store/case-store";
 
 type SlotId = (typeof deductionSlots)[number];
@@ -21,14 +22,28 @@ const tokens: Token[] = [
 
 export function DeductionPuzzle() {
   const solved = useCaseStore((state) => state.completedPuzzles.includes("deduction"));
+  const unlockedIds = useCaseStore((state) => state.unlockedEvidenceIds);
+  const verdicts = useCaseStore((state) => state.evidenceVerdicts);
+  const relations = useCaseStore((state) => state.evidenceRelations);
+  const touchedIds = useCaseStore((state) => state.evidenceReviewTouchedIds);
+  const legacyVerifiedIds = useCaseStore((state) => state.legacyVerifiedEvidenceIds);
   const completePuzzle = useCaseStore((state) => state.completePuzzle);
   const recordAttempt = useCaseStore((state) => state.recordAttempt);
+  const markTaskProgress = useCaseStore((state) => state.markTaskProgress);
   const { cue } = useFogAudio();
   const [values, setValues] = useState<Partial<Record<SlotId, string>>>({});
+  const [evidenceBySlot, setEvidenceBySlot] = useState<Partial<Record<SlotId, string[]>>>({});
   const [selected, setSelected] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState("把同类线索拖入五个槽位，组成一条能解释全部记录的责任链。");
+  const [feedback, setFeedback] = useState("把同类线索放入五个槽位，并为每一段附加已核验的交叉证据。");
   const [hintIndex, setHintIndex] = useState(-1);
   const tokenById = useMemo(() => new Map(tokens.map((token) => [token.id, token])), []);
+  const verifiedIds = useMemo(() => getVerifiedEvidenceIds({
+    visibleEvidenceIds: unlockedIds,
+    legacyVerifiedEvidenceIds: legacyVerifiedIds,
+    touchedEvidenceIds: touchedIds,
+    verdicts,
+    relations,
+  }), [legacyVerifiedIds, relations, touchedIds, unlockedIds, verdicts]);
 
   const assign = (tokenId: string, slot: SlotId) => {
     const token = tokenById.get(tokenId);
@@ -47,30 +62,38 @@ export function DeductionPuzzle() {
     assign(event.dataTransfer.getData("text/deduction-token"), slot);
   };
 
+  const toggleEvidence = (slot: SlotId, evidenceId: string) => {
+    setEvidenceBySlot((current) => {
+      const selectedIds = current[slot] ?? [];
+      const next = selectedIds.includes(evidenceId)
+        ? selectedIds.filter((id) => id !== evidenceId)
+        : [...selectedIds, evidenceId];
+      return { ...current, [slot]: next };
+    });
+    markTaskProgress("close-chain", slot);
+    cue("paper");
+  };
+
   const validate = () => {
     recordAttempt("deduction");
-    if (deductionSlots.some((slot) => !values[slot])) {
-      setFeedback("责任链尚未闭合。五个槽位都必须有可核对的证据。");
-      cue("error");
-      return;
-    }
-    if (isDeductionSolved(values)) {
+    const result = evaluateDeductionSubmission(values, evidenceBySlot, verifiedIds, relations);
+    if (result.solved) {
+      deductionSlots.forEach((slot) => markTaskProgress("close-chain", slot));
       completePuzzle("deduction");
-      setFeedback("逻辑链闭合。最终档案、封存指令与匿名声纹比对已开放。");
+      setFeedback("逻辑链与附加证据同时闭合。最终档案、封存指令与匿名声纹比对已开放。");
       cue("unlock");
       return;
     }
-    const wrong = deductionSlots.filter((slot) => values[slot] !== deductionAnswer[slot]).length;
-    setFeedback(`链条中仍有 ${wrong} 处无法被原始记录同时支持。先检查“谁拥有主时钟权限”与“篡改真正保护了什么”。`);
+    setFeedback(`本次提交：逻辑节点错误 ${result.logicErrors} 处，证据支持不足 ${result.evidenceSupportMissing} 段，互相矛盾的附件 ${result.contradictionCount} 组。`);
     cue("error");
   };
 
-  if (solved) return <section className="puzzle-success"><Check size={20} aria-hidden="true" /><div><strong>责任链已闭合</strong><p>周既明 → 00:31 → 监控室 → 快调系统主时钟 → 掩盖白鹭七号靠泊。</p></div></section>;
+  if (solved) return <section className="puzzle-success"><Check size={20} aria-hidden="true" /><div><strong>责任链已闭合</strong><p>五段逻辑均已由独立记录交叉支持，最终卷宗可以安全打开。</p></div></section>;
 
   return (
     <section className="puzzle-panel deduction-puzzle" aria-labelledby="deduction-title">
       <div className="puzzle-heading"><div><p className="eyebrow">PUZZLE 04 / EVIDENCE CHAIN</p><h3 id="deduction-title">证据关系推理</h3></div><Link2 size={24} aria-hidden="true" /></div>
-      <p className="puzzle-brief">拖动或点击线索，再放入对应槽位。只有五段逻辑全部正确，最终卷宗才会解锁。</p>
+      <p className="puzzle-brief">先构成五段责任链，再为每段附加至少一条已经交叉核验的证据。错误判断不会锁死，可以随时回到证据墙修正。</p>
       <div className="deduction-chain">
         {deductionSlots.map((slot, index) => {
           const value = values[slot];
@@ -79,7 +102,13 @@ export function DeductionPuzzle() {
         })}
       </div>
       <div className="token-bank" aria-label="可用推理线索">{tokens.map((token) => <button type="button" draggable key={token.id} onDragStart={(event) => event.dataTransfer.setData("text/deduction-token", token.id)} onClick={() => setSelected(token.id)} className={selected === token.id ? "is-selected" : ""} aria-pressed={selected === token.id}><small>{slotLabels[token.slot]}</small>{token.label}</button>)}</div>
-      <div className="deduction-footer"><p className="puzzle-feedback" role="status">{feedback}</p><button type="button" className="primary-action" onClick={validate}>验证责任链</button></div>
+
+      <section className="deduction-evidence" aria-labelledby="deduction-evidence-title">
+        <header><Paperclip size={16} aria-hidden="true" /><div><strong id="deduction-evidence-title">附加核验证据</strong><span>绿色条目可作为有效支持；灰色条目需要先在证据墙完成判断。</span></div></header>
+        <div className="deduction-evidence-grid">{deductionSlots.map((slot) => <fieldset key={slot}><legend>{slotLabels[slot]}</legend>{deductionEvidenceRequirements[slot].filter((id) => unlockedIds.includes(id)).map((id) => { const active = evidenceBySlot[slot]?.includes(id) ?? false; const verified = verifiedIds.includes(id); return <button type="button" key={id} className={`${active ? "is-selected" : ""} ${verified ? "is-verified" : "needs-review"}`} onClick={() => toggleEvidence(slot, id)} aria-pressed={active}><ShieldAlert size={13} aria-hidden="true" /><span>{evidenceTitle(id)}</span><small>{verified ? "已核验" : "待核验"}</small></button>; })}</fieldset>)}</div>
+      </section>
+
+      <div className="deduction-footer"><p className="puzzle-feedback" role="status">{feedback}</p><button type="button" className="primary-action" onClick={validate}>验证责任链与附件</button></div>
       <button type="button" className="hint-button" onClick={() => setHintIndex((value) => Math.min(value + 1, puzzleGuidance.deduction.length - 1))}><Search size={14} aria-hidden="true" /> 请求渐进提示</button>
       {hintIndex >= 0 && <p className="hint-copy">提示 {hintIndex + 1}：{puzzleGuidance.deduction[hintIndex]}</p>}
     </section>
