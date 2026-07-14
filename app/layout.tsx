@@ -3,6 +3,7 @@ import "./globals.css";
 import "./responsive.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://archive.luomo.moe"),
   title: "雾港档案：失踪的第七码头",
   description: "进入停机七年的港务档案系统，校准被偷走的十一分钟，拼出白鹭七号与林知夏失踪案的真相。",
   icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },

@@ -40,6 +40,17 @@ npx tsc --noEmit --incremental false
 
 存档保存在浏览器 `localStorage` 的 `fog-harbor-save-v1` 键中；“重新开始”会保留已发现结局并进入下一轮调查。
 
+## 私有服务器部署
+
+服务器版本使用 `Dockerfile.server` 和 `compose.server.yaml`。应用容器只映射到主机 `127.0.0.1:8797`，`cloudflared` 容器通过同一 Compose 网络访问应用，公网不需要开放应用端口。
+
+部署机需要 Docker 与 Docker Compose，并在未提交的 `.env.server` 中提供远程管理 Tunnel 的 `TUNNEL_TOKEN`：
+
+```bash
+docker compose -f compose.server.yaml --env-file .env.server up -d --build
+curl --fail http://127.0.0.1:8797/
+```
+
 ## 主要目录
 
 - `app/`：页面入口、全局样式与错误状态

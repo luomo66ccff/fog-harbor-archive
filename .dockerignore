@@ -1,0 +1,12 @@
+.git
+.next
+.playwright-cli
+.vinext
+.wrangler
+dist
+node_modules
+output
+outputs
+work
+.env*
+npm-debug.log*
