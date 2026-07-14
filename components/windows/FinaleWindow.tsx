@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Archive, Check, Eye, FileWarning, Radio, Send, Trash2 } from "lucide-react";
 import { useFogAudio } from "@/components/audio/AudioProvider";
+import { CaseReflection } from "@/components/narrative/CaseReflection";
+import { ProvisionalTheory } from "@/components/narrative/ProvisionalTheory";
 import { HiddenPuzzle } from "@/components/puzzles/HiddenPuzzle";
 import { WindowFrame } from "@/components/windows/WindowFrame";
 import { archiveDocuments, endings } from "@/lib/case-data";
@@ -25,6 +27,7 @@ export function FinaleWindow() {
   const touchedIds = useCaseStore((state) => state.evidenceReviewTouchedIds);
   const legacyVerifiedIds = useCaseStore((state) => state.legacyVerifiedEvidenceIds);
   const anonymous = useCaseStore((state) => state.discoveredAnonymous);
+  const readEvidenceIds = useCaseStore((state) => state.readEvidenceIds);
   const code = useCaseStore((state) => state.investigatorCode);
   const identifyAnonymous = useCaseStore((state) => state.identifyAnonymous);
   const chooseEnding = useCaseStore((state) => state.chooseEnding);
@@ -74,7 +77,10 @@ export function FinaleWindow() {
   return (
     <WindowFrame id="finale" title="最终档案 / 决策节点" index="FINAL" className="max-window finale-window">
       <div className="finale-layout">
-        <article className="final-dossier"><header><span>重建卷宗</span><strong>P-07-0712 / FINAL</strong></header><p className="eyebrow">AUTHOR / 调查员 {code}</p><h2>{finalDoc.title}</h2><blockquote>{finalDoc.excerpt}</blockquote>{finalDoc.body.map((paragraph) => <p key={paragraph}>{paragraph.replaceAll("{{code}}", code)}</p>)}<footer><span>系统校时偏移 +11 分钟</span><span>船号 H-1707</span><span>官方天气：伪造</span></footer></article>
+        <article className="final-dossier"><header><span>重建卷宗</span><strong>P-07-0712 / FINAL</strong></header><p className="eyebrow">AUTHOR / 调查员 {code}</p><h2>{finalDoc.title}</h2><blockquote>{finalDoc.excerpt}</blockquote>{finalDoc.body.map((paragraph) => <p key={paragraph}>{paragraph.replaceAll("{{code}}", code)}</p>)}<aside className="external-reader-log" role="note"><span>SESSION WATCH / ARCHIVE-02</span><strong>检测到外部同步读取</strong><p>这台终端仍标记为离线。第二读取游标的身份与撤销权限均为空。</p></aside><footer><span>系统校时偏移 +11 分钟</span><span>船号 H-1707</span><span>官方天气：伪造</span></footer></article>
+
+        <CaseReflection />
+        {(readEvidenceIds.includes("ev-toolbox") || readEvidenceIds.includes("ev-voiceprint")) && <ProvisionalTheory correction compact />}
 
         <section className="identity-check"><div className="puzzle-heading"><div><p className="eyebrow">VOICEPRINT / UNREGISTERED</p><h3>匿名委托人是谁？</h3></div><Radio size={20} /></div>
           <div className="voice-strip"><span>潮汐_0 / 00:31</span><p>“陈牧把我从检修梯拉上来时，我以为所有证据都沉了。别再把我叫作失踪者。”</p></div>
@@ -86,9 +92,9 @@ export function FinaleWindow() {
 
         <section className="ending-decisions"><div className="decision-heading"><p className="eyebrow">FINAL DECISION</p><h3>决定档案的去向</h3><span>已复核关键证据：{availability.critical} / 公布需 8 / 隐藏档案需 10</span></div>
           <div className="ending-options">
-            <button type="button" disabled={!availability.truth} onClick={() => finish("truth")}><Send size={19} /><span><strong>{endings.truth.label}</strong><small>{availability.truth ? "向公众镜像全部档案，触发重新调查。" : "仍需在证据墙复核更多关键证据。"}</small></span></button>
-            <button type="button" disabled={!availability.trade} onClick={() => finish("trade")}><Trash2 size={19} /><span><strong>{endings.trade.label}</strong><small>删除公开副本，换取一份关于调查员过去的记录。</small></span></button>
-            <button type="button" disabled={!availability.seventh} onClick={() => finish("seventh")}><Archive size={19} /><span><strong>{endings.seventh.label}</strong><small>{availability.seventh ? "使用七港镜像图进入栖潮计划隐藏索引。" : "需识破委托人、复核 10 项关键证据并完成镜像口令。"}</small></span></button>
+            <button type="button" data-ending-id="truth" disabled={!availability.truth} onClick={() => finish("truth")}><Send size={19} /><span><strong>{endings.truth.label}</strong><small>{availability.truth ? "向公众镜像全部档案，触发重新调查。" : "仍需在证据墙复核更多关键证据。"}</small></span></button>
+            <button type="button" data-ending-id="trade" disabled={!availability.trade} onClick={() => finish("trade")}><Trash2 size={19} /><span><strong>{endings.trade.label}</strong><small>有限公开污染与作伪证据，同时隐藏林知夏的生还路径。</small></span></button>
+            <button type="button" data-ending-id="seventh" disabled={!availability.seventh} onClick={() => finish("seventh")}><Archive size={19} /><span><strong>{endings.seventh.label}</strong><small>{availability.seventh ? "使用七港镜像图追踪其余六个节点。" : "需识破委托人、复核 10 项关键证据并完成镜像口令。"}</small></span></button>
           </div>
           {!availability.truth && <p className="decision-warning"><FileWarning size={15} /> 接受交易始终可选；更强的结局依赖你真正读过的关键证据，而不只是一枚最后按钮。</p>}
         </section>

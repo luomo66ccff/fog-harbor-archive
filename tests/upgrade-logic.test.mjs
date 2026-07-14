@@ -184,6 +184,8 @@ test("photo shuffling, swapping, misplacement validation, and both hotspots shar
     createPhotoPieces,
     isPhotoSolved,
     movePhotoPiece,
+    nextPhotoScanStep,
+    PHOTO_SCAN_SEQUENCE,
     PHOTO_PIECE_IDS,
     shufflePhotoPieceIds,
     shufflePhotoPieces,
@@ -234,6 +236,116 @@ test("photo shuffling, swapping, misplacement validation, and both hotspots shar
   assert.equal(arePhotoHotspotsComplete(["ship-number"]), false);
   assert.equal(arePhotoHotspotsComplete(["second-figure"]), false);
   assert.equal(arePhotoHotspotsComplete(["ship-number", "second-figure"]), true);
+
+  let scanIndex = -1;
+  const ordinaryHighlights = [];
+  for (let count = 0; count < PHOTO_SCAN_SEQUENCE.length; count += 1) {
+    const step = nextPhotoScanStep(scanIndex, false);
+    scanIndex = step.index;
+    if (step.highlightedHotspot) ordinaryHighlights.push(step.highlightedHotspot);
+    assert.equal(step.confirmedHotspot, null, "ordinary scanning must never confirm a hotspot");
+  }
+  assert.deepEqual(ordinaryHighlights, ["ship-number", "second-figure"]);
+
+  scanIndex = -1;
+  const assistedConfirmations = [];
+  for (let count = 0; count < PHOTO_SCAN_SEQUENCE.length; count += 1) {
+    const step = nextPhotoScanStep(scanIndex, true);
+    scanIndex = step.index;
+    if (step.confirmedHotspot) assistedConfirmations.push(step.confirmedHotspot);
+  }
+  assert.deepEqual(assistedConfirmations, ["ship-number", "second-figure"]);
+  assert.equal(arePhotoHotspotsComplete(assistedConfirmations), true);
+});
+
+test("photo completion timer cancels on unmount and cannot complete twice", async () => {
+  const { cancelOneShotTimer, scheduleOneShotTimer } = await loadModule("/lib/puzzle-engine.ts");
+  const timerRef = { current: null };
+  const queuedRef = { current: false };
+  const disposedRef = { current: false };
+  const scheduled = [];
+  const cleared = [];
+  let completed = 0;
+  const schedule = (callback, delay) => {
+    scheduled.push({ callback, delay });
+    return scheduled.length;
+  };
+
+  assert.equal(scheduleOneShotTimer(
+    timerRef, queuedRef, disposedRef, () => { completed += 1; }, schedule,
+  ), true);
+  assert.equal(scheduleOneShotTimer(
+    timerRef, queuedRef, disposedRef, () => { completed += 1; }, schedule,
+  ), false, "a second hotspot confirmation must not queue another completion");
+  assert.equal(scheduled.length, 1);
+  assert.equal(scheduled[0].delay, 520);
+
+  cancelOneShotTimer(timerRef, disposedRef, (timerId) => cleared.push(timerId));
+  assert.deepEqual(cleared, [1]);
+  scheduled[0].callback();
+  assert.equal(completed, 0, "an unmounted inspection must ignore a late timer callback");
+
+  const activeTimer = { current: null };
+  const activeQueued = { current: false };
+  const activeDisposed = { current: false };
+  const activeCallbacks = [];
+  scheduleOneShotTimer(
+    activeTimer,
+    activeQueued,
+    activeDisposed,
+    () => { completed += 1; },
+    (callback) => { activeCallbacks.push(callback); return 17; },
+  );
+  activeCallbacks[0]();
+  activeCallbacks[0]();
+  assert.equal(completed, 1, "even a repeated timer callback completes the puzzle once");
+});
+
+test("deduction tokens can move through any slot while type and logic errors stay distinct", async () => {
+  const {
+    deductionAnswer,
+    deductionSlots,
+    deductionTokens,
+    evaluateDeductionPlacement,
+    getDeductionToken,
+    isDeductionSolved,
+    placeDeductionToken,
+    shouldRevealDeductionTypes,
+  } = await loadModule("/lib/puzzle-engine.ts");
+
+  assert.equal(deductionTokens.length, 15);
+  assert.equal(new Set(deductionTokens.map((token) => token.id)).size, deductionTokens.length);
+  for (const slot of deductionSlots) {
+    assert.equal(deductionTokens.filter((token) => token.category === slot).length, 3);
+    assert.equal(getDeductionToken(deductionAnswer[slot])?.category, slot);
+  }
+
+  let placement = placeDeductionToken({}, "zhou-jiming", "time");
+  assert.deepEqual(placement, { time: "zhou-jiming" }, "wrong-type placement is allowed until submission");
+  assert.deepEqual(evaluateDeductionPlacement(placement), { typeErrors: 1, logicErrors: 4 });
+
+  placement = placeDeductionToken(placement, "zhou-jiming", "person");
+  assert.deepEqual(placement, { person: "zhou-jiming" }, "moving a token clears its previous slot");
+  assert.deepEqual(placeDeductionToken(placement, "unknown-token", "time"), placement);
+
+  assert.deepEqual(evaluateDeductionPlacement({ ...deductionAnswer, time: "00:39" }), {
+    typeErrors: 0,
+    logicErrors: 1,
+  });
+  assert.deepEqual(evaluateDeductionPlacement({ ...deductionAnswer, time: "zhou-jiming" }), {
+    typeErrors: 1,
+    logicErrors: 0,
+  });
+  assert.deepEqual(evaluateDeductionPlacement({ ...deductionAnswer, time: "unknown-token" }), {
+    typeErrors: 1,
+    logicErrors: 0,
+  });
+  assert.equal(isDeductionSolved(deductionAnswer), true);
+  assert.equal(isDeductionSolved({ ...deductionAnswer, time: "00:39" }), false);
+  assert.equal(shouldRevealDeductionTypes(0), false);
+  assert.equal(shouldRevealDeductionTypes(1), false);
+  assert.equal(shouldRevealDeductionTypes(2), true);
+  assert.equal(shouldRevealDeductionTypes(3), true);
 });
 
 test("evidence review and five-link deduction report exact validation counts", async () => {
@@ -288,13 +400,14 @@ test("evidence review and five-link deduction report exact validation counts", a
     {},
   ), {
     solved: true,
+    typeErrors: 0,
     logicErrors: 0,
     evidenceSupportMissing: 0,
     contradictionCount: 0,
   });
 
   const countedFailure = evaluateDeductionSubmission(
-    { ...deductionAnswer, time: "00:42" },
+    { ...deductionAnswer, time: "00:39" },
     {
       person: ["ev-duty", "ev-offset"],
       time: [],
@@ -310,6 +423,7 @@ test("evidence review and five-link deduction report exact validation counts", a
   );
   assert.deepEqual(countedFailure, {
     solved: false,
+    typeErrors: 0,
     logicErrors: 1,
     evidenceSupportMissing: 2,
     contradictionCount: 1,

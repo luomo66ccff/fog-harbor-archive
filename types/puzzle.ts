@@ -43,3 +43,30 @@ export interface PhotoPieceState {
 
 export type PhotoPuzzleStage = "assembling" | "scanning" | "inspecting";
 export type PhotoHotspotId = "ship-number" | "second-figure";
+
+export interface PhotoScanStep {
+  index: number;
+  highlightedHotspot: PhotoHotspotId | null;
+  confirmedHotspot: PhotoHotspotId | null;
+}
+
+export type DeductionSlotId = "person" | "time" | "place" | "action" | "motive";
+
+export interface DeductionTokenDefinition {
+  id: string;
+  label: string;
+  category: DeductionSlotId;
+}
+
+export type DeductionPlacement = Partial<Record<DeductionSlotId, string>>;
+
+export interface DeductionPlacementEvaluation {
+  typeErrors: number;
+  logicErrors: number;
+}
+
+export interface DeductionSubmissionEvaluation extends DeductionPlacementEvaluation {
+  solved: boolean;
+  evidenceSupportMissing: number;
+  contradictionCount: number;
+}

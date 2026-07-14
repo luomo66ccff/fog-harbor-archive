@@ -56,7 +56,7 @@ const taskDefinitions: readonly InvestigationTaskDefinition[] = [
   {
     id: "restore-time",
     title: "找回被偷走的十一分钟",
-    description: "比较同一事件在系统记录与物理记录中的时间，恢复可信的案件时序。",
+    description: "从‘暴雨落水’的官方结论出发，比较系统与物理记录，找出第一处拒绝服从屏幕的时间。",
     target: { windowId: "archive", tab: "schedule" },
     puzzleId: "schedule",
     progressTotal: 4,
@@ -70,7 +70,7 @@ const taskDefinitions: readonly InvestigationTaskDefinition[] = [
   {
     id: "repair-call",
     title: "修复最后通话",
-    description: "调整纸带的播放与滤波条件，让被噪声遮住的高频信号重新可读。",
+    description: "修复最后通话、高频口令与剪接痕迹，判断背景里的工作口令究竟是追踪还是保护。",
     target: { windowId: "audio", tab: "analyze" },
     puzzleId: "frequency",
     progressTotal: 2,
@@ -84,7 +84,7 @@ const taskDefinitions: readonly InvestigationTaskDefinition[] = [
   {
     id: "reconstruct-photo",
     title: "拼合密封照片",
-    description: "复原监控室中的照片包，并检查船体与水线附近的异常细节。",
+    description: "复原照片，确认 H-1707、第二道人影与控制室亮点，并留下一个可被新证据修正的临时判断。",
     target: { windowId: "surveillance" },
     puzzleId: "photo",
     progressTotal: 2,
@@ -98,7 +98,7 @@ const taskDefinitions: readonly InvestigationTaskDefinition[] = [
   {
     id: "close-chain",
     title: "闭合五段责任链",
-    description: "把人物、时间、地点、行为与目的连成能被证据共同支持的责任链。",
+    description: "闭合责任链，同时区分主导者、执行者、被胁迫者、保护者与失踪证人。",
     target: { windowId: "evidence", tab: "deduction" },
     puzzleId: "deduction",
     progressTotal: 5,
@@ -112,7 +112,7 @@ const taskDefinitions: readonly InvestigationTaskDefinition[] = [
   {
     id: "review-finale",
     title: "阅读最终档案并作出选择",
-    description: "复核完整责任链与匿名委托人的证词，决定真相最终去向。",
+    description: "复核人物灰度与外部读取日志；当档案也在观察你时，决定真相最终去向。",
     target: { windowId: "finale" },
     progressTotal: 1,
     progressUnit: "项最终选择",
@@ -165,14 +165,14 @@ const unlockNotifications: Record<UnlockEventId, UnlockNotificationDefinition> =
   photo: {
     eventId: "photo",
     title: "证据墙已开放",
-    content: "照片、岸钟倒影与检修梯线索已进入关系图。",
+    content: "照片、岸钟倒影、检修梯线索与异常付款批次已进入关系图。",
     reason: "密封照片中的关键细节已经确认。",
     target: { windowId: "evidence", tab: "board" },
   },
   deduction: {
     eventId: "deduction",
     title: "最终档案已开放",
-    content: "重建卷宗、封存指令与声纹比对现在可以访问。",
+    content: "重建卷宗、封存指令、医院缴费附件与声纹比对现在可以访问。",
     reason: "五段责任链已经被现有证据闭合。",
     target: { windowId: "finale" },
   },

@@ -1,7 +1,7 @@
 "use client";
 
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
-import { Eye, LockKeyhole, MailOpen, MapPin, Minus, Plus, RotateCcw, ShieldQuestion } from "lucide-react";
+import { Eye, FlipHorizontal2, LockKeyhole, MailOpen, MapPin, Minus, Plus, RotateCcw, ShieldQuestion } from "lucide-react";
 import { HiddenPuzzle } from "@/components/puzzles/HiddenPuzzle";
 import { WindowFrame } from "@/components/windows/WindowFrame";
 import { locations, messages, people, timeline } from "@/lib/case-data";
@@ -58,10 +58,13 @@ export function PeopleWindow() {
 export function MapWindow() {
   const completed = useCaseStore((state) => state.completedPuzzles);
   const anonymous = useCaseStore((state) => state.discoveredAnonymous);
+  const discoveredEasterEggs = useCaseStore((state) => state.discoveredEasterEggs);
+  const discoverEasterEgg = useCaseStore((state) => state.discoverEasterEgg);
   const intent = useWindowStore((state) => state.pendingIntents.map);
   const consumeIntent = useWindowStore((state) => state.consumeIntent);
   const [selectedId, setSelectedId] = useState("loc-pier7");
   const [zoomIndex, setZoomIndex] = useState(0);
+  const [mirrored, setMirrored] = useState(false);
   const hiddenIndexRef = useRef<HTMLDivElement>(null);
   const hotspotRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const selected = mapHotspots.find((location) => location.id === selectedId) ?? mapHotspots[0];
@@ -93,7 +96,7 @@ export function MapWindow() {
       <div className="map-toolbar" aria-label="地图缩放控制"><button type="button" onClick={() => setZoomIndex((value) => Math.max(0, value - 1))} disabled={zoomIndex === 0} aria-label="缩小港区地图"><Minus size={16} /></button><output aria-live="polite">{Math.round(zoom * 100)}%</output><button type="button" onClick={() => setZoomIndex((value) => Math.min(mapZoomLevels.length - 1, value + 1))} disabled={zoomIndex === mapZoomLevels.length - 1} aria-label="放大港区地图"><Plus size={16} /></button><button type="button" onClick={() => setZoomIndex(0)} disabled={zoomIndex === 0}><RotateCcw size={15} /> 重置</button></div>
       <div className="map-layout material-map-layout">
         <div className="map-viewport">
-          <div className="harbor-map material-harbor-map" style={mapStyle}>
+          <div className={`harbor-map material-harbor-map ${mirrored ? "is-mirrored" : ""}`} style={mapStyle}>
           <span className="map-watermark">雾港港务局 / 2019 港区调查图</span>
           {mapHotspots.map((location) => {
             const unlocked = !location.unlockAfter || completed.includes(location.unlockAfter);
@@ -105,6 +108,7 @@ export function MapWindow() {
         </div>
         <aside className={`map-note material-map-note ${selectedUnlocked ? "" : "is-locked"}`}><p className="eyebrow">LOCATION / {selected.kind}</p><h3>{selected.name}</h3>{selectedUnlocked ? <><p>{selected.description}</p><div>{selected.linkedEvidence.map((id) => <span key={id}>{id.replace("ev-", "E/")}</span>)}</div></> : <p>照片索引尚未恢复。目前只能确认这里存在一条被封锁的港务通道。</p>}{taskLocation === selected.id && <strong className="map-task-badge">当前调查目标</strong>}</aside>
       </div>
+      {anonymous && <section className={`map-mirror-index ${mirrored ? "is-visible" : ""}`} data-easter-egg="mirror-map"><button type="button" onClick={() => { setMirrored((value) => !value); discoverEasterEgg("mirror-map"); }} aria-pressed={mirrored}><FlipHorizontal2 size={15} aria-hidden="true" /> {mirrored ? "恢复正向地图" : "镜像查看地图背面"}</button>{mirrored && <div><span>COAST-02 / ██-14</span><span>COAST-03 / █7-██</span><span>COAST-04 / 2█-09</span><span>COAST-05 / ██-31</span><span>COAST-06 / 0█-██</span><span>COAST-07 / ██-12</span><p>六个沿岸节点仅保留模糊编号；真实地名已被销毁。</p></div>}{discoveredEasterEggs.includes("mirror-map") && !mirrored && <small>地图背面的六组编号已记录。</small>}</section>}
       <div id="hidden-index" ref={hiddenIndexRef} tabIndex={-1}>{completed.includes("deduction") && anonymous && <HiddenPuzzle />}{completed.includes("deduction") && !anonymous && <div className="locked-inline"><ShieldQuestion size={17} /><span>地图背面有潮湿压痕，但系统要求先确认匿名委托人的身份。</span></div>}</div>
     </WindowFrame>
   );
@@ -120,12 +124,16 @@ export function TimelineWindow() {
 
 export function InboxWindow() {
   const completed = useCaseStore((state) => state.completedPuzzles);
+  const discoveredEasterEggs = useCaseStore((state) => state.discoveredEasterEggs);
   const code = useCaseStore((state) => state.investigatorCode);
   const readIds = useCaseStore((state) => state.readMessageIds);
   const markRead = useCaseStore((state) => state.markMessageRead);
   const intent = useWindowStore((state) => state.pendingIntents.inbox);
   const consumeIntent = useWindowStore((state) => state.consumeIntent);
-  const available = useMemo(() => messages.filter((message) => !message.unlockAfter || completed.includes(message.unlockAfter)), [completed]);
+  const available = useMemo(() => messages.filter((message) => {
+    if (message.id === "msg-second-run" && !discoveredEasterEggs.includes("second-run-knock")) return false;
+    return !message.unlockAfter || completed.includes(message.unlockAfter);
+  }), [completed, discoveredEasterEggs]);
   const [initialIntent] = useState(() => useWindowStore.getState().pendingIntents.inbox);
   const [selectedId, setSelectedId] = useState(() => available.some((message) => message.id === initialIntent?.focusId) ? initialIntent!.focusId! : "msg-commission");
   const selected = available.find((message) => message.id === selectedId) ?? available[0];

@@ -1,0 +1,76 @@
+{
+  "schemaVersion": 1,
+  "sourceRoot": "design-assets/source",
+  "assets": [
+    {
+      "id": "bg-investigation-room",
+      "file": "bg-investigation-room.png",
+      "width": 1672,
+      "height": 941,
+      "sha256": "3279b76a0173a35465370e517e6c8523ac1a788874a72e065bae6ef81bdfbf45"
+    },
+    {
+      "id": "puzzle-cctv-pier7",
+      "file": "puzzle-cctv-pier7.png",
+      "width": 1448,
+      "height": 1086,
+      "sha256": "23f4f2c92402481edf29ce49358aca55b9c1c4adff55eb4a7f14eb4932b98c33"
+    },
+    {
+      "id": "map-harbor-investigation",
+      "file": "map-harbor-investigation.png",
+      "width": 1448,
+      "height": 1086,
+      "sha256": "42cb17d169a9c623a56cbb5ce0f6ed6b4fa9186ded7307d0ef2eec7cffe427e8"
+    },
+    {
+      "id": "document-case-folder",
+      "file": "document-case-folder.png",
+      "width": 1086,
+      "height": 1448,
+      "sha256": "548a5de5358d2788c939169891ecb15125df186a32d665b9c3591364924ba604"
+    },
+    {
+      "id": "document-case-summary",
+      "file": "document-case-summary.png",
+      "width": 1086,
+      "height": 1448,
+      "sha256": "acf2aac92b70d9a94cf1c218d90a33a7151513524f724a0f0ad8e29e136791f9"
+    },
+    {
+      "id": "document-duty-roster",
+      "file": "document-duty-roster.png",
+      "width": 1086,
+      "height": 1448,
+      "sha256": "2f489e13ac62762806016c81d3dd5951f142e4daa05108749e98d2cd7d78d821"
+    },
+    {
+      "id": "document-shipping-manifest",
+      "file": "document-shipping-manifest.png",
+      "width": 1086,
+      "height": 1448,
+      "sha256": "503d3697b8c6b37ef2aa44d8a5c2cd37d5cde03580175c77555d266987e476df"
+    },
+    {
+      "id": "document-weather-log",
+      "file": "document-weather-log.png",
+      "width": 1086,
+      "height": 1448,
+      "sha256": "abda7a37463bea0097cd1f8455efd3f4313df596bdc802386f1fad3ff0f5a514"
+    },
+    {
+      "id": "device-tape-recorder",
+      "file": "device-tape-recorder.png",
+      "width": 1448,
+      "height": 1086,
+      "sha256": "bf1af0c2b9774bb53709d26c17d9e718ff03790274cf85b2a09fc91903237b0f"
+    },
+    {
+      "id": "room-surveillance-wall",
+      "file": "room-surveillance-wall.png",
+      "width": 1448,
+      "height": 1086,
+      "sha256": "f10b3d87bf98081838ad5164d2b20d4bb6a34f101568ebdb5f7f71233e1ce35b"
+    }
+  ]
+}

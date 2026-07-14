@@ -1,7 +1,12 @@
 import type {
+  DeductionPlacement,
+  DeductionPlacementEvaluation,
+  DeductionSlotId,
+  DeductionTokenDefinition,
   FrequencySignalState,
   PhotoHotspotId,
   PhotoPieceState,
+  PhotoScanStep,
   TimelineAlignmentResult,
   TimelineEvent,
 } from "@/types/puzzle";
@@ -159,9 +164,92 @@ export function arePhotoHotspotsComplete(found: Iterable<PhotoHotspotId>) {
   return ids.has("ship-number") && ids.has("second-figure");
 }
 
-export const deductionSlots = ["person", "time", "place", "action", "motive"] as const;
+interface MutableValue<T> {
+  current: T;
+}
 
-export const deductionAnswer: Record<(typeof deductionSlots)[number], string> = {
+export function scheduleOneShotTimer(
+  timerRef: MutableValue<number | null>,
+  queuedRef: MutableValue<boolean>,
+  disposedRef: MutableValue<boolean>,
+  onComplete: () => void,
+  schedule: (callback: () => void, delay: number) => number,
+  delay = 520,
+) {
+  if (queuedRef.current || disposedRef.current) return false;
+  queuedRef.current = true;
+  let timerId = -1;
+  timerId = schedule(() => {
+    if (disposedRef.current || timerRef.current !== timerId) return;
+    timerRef.current = null;
+    onComplete();
+  }, delay);
+  timerRef.current = timerId;
+  return true;
+}
+
+export function cancelOneShotTimer(
+  timerRef: MutableValue<number | null>,
+  disposedRef: MutableValue<boolean>,
+  clear: (timerId: number) => void,
+) {
+  disposedRef.current = true;
+  if (timerRef.current === null) return;
+  clear(timerRef.current);
+  timerRef.current = null;
+}
+
+export const PHOTO_SCAN_SEQUENCE: readonly (PhotoHotspotId | null)[] = [
+  null,
+  "ship-number",
+  null,
+  null,
+  "second-figure",
+  null,
+] as const;
+
+export function nextPhotoScanStep(
+  currentIndex: number,
+  assistedInvestigation = false,
+): PhotoScanStep {
+  const index = (currentIndex + 1) % PHOTO_SCAN_SEQUENCE.length;
+  const highlightedHotspot = PHOTO_SCAN_SEQUENCE[index];
+  return {
+    index,
+    highlightedHotspot,
+    confirmedHotspot: assistedInvestigation ? highlightedHotspot : null,
+  };
+}
+
+export const deductionSlots = ["person", "time", "place", "action", "motive"] as const satisfies readonly DeductionSlotId[];
+
+export const deductionTokens = [
+  { id: "zhou-jiming", label: "周既明", category: "person" },
+  { id: "gu-weian", label: "顾惟安", category: "person" },
+  { id: "xu-wancheng", label: "许晚澄", category: "person" },
+  { id: "00:31", label: "00:31", category: "time" },
+  { id: "00:39", label: "00:39", category: "time" },
+  { id: "01:07", label: "01:07", category: "time" },
+  { id: "loc-control", label: "监控室", category: "place" },
+  { id: "loc-pier7", label: "第七码头", category: "place" },
+  { id: "loc-weather", label: "气象站", category: "place" },
+  { id: "clock-shift", label: "快调系统主时钟", category: "action" },
+  { id: "erase-rain", label: "删除原始天气", category: "action" },
+  { id: "open-gate", label: "打开七号外闸", category: "action" },
+  { id: "hide-heron", label: "掩盖白鹭七号靠泊", category: "motive" },
+  { id: "fake-call", label: "伪造家属通话", category: "motive" },
+  { id: "protect-lin", label: "保护林知夏离港", category: "motive" },
+] as const satisfies readonly DeductionTokenDefinition[];
+
+const deductionTokenById = new Map<string, DeductionTokenDefinition>(
+  deductionTokens.map((token) => [token.id, token]),
+);
+
+export function getDeductionToken(tokenId: string) {
+  return deductionTokenById.get(tokenId);
+}
+
+export const deductionAnswer: Record<DeductionSlotId, string> = {
   person: "zhou-jiming",
   time: "00:31",
   place: "loc-control",
@@ -169,6 +257,46 @@ export const deductionAnswer: Record<(typeof deductionSlots)[number], string> = 
   motive: "hide-heron",
 };
 
-export function isDeductionSolved(values: Partial<Record<(typeof deductionSlots)[number], string>>) {
-  return deductionSlots.every((slot) => values[slot] === deductionAnswer[slot]);
+export function placeDeductionToken(
+  values: DeductionPlacement,
+  tokenId: string,
+  targetSlot: DeductionSlotId,
+): DeductionPlacement {
+  if (!getDeductionToken(tokenId) || !deductionSlots.includes(targetSlot)) return { ...values };
+  const next = { ...values };
+  for (const slot of deductionSlots) {
+    if (next[slot] === tokenId) delete next[slot];
+  }
+  next[targetSlot] = tokenId;
+  return next;
+}
+
+export function evaluateDeductionPlacement(values: DeductionPlacement): DeductionPlacementEvaluation {
+  let typeErrors = 0;
+  let logicErrors = 0;
+
+  for (const slot of deductionSlots) {
+    const tokenId = values[slot];
+    if (!tokenId) {
+      logicErrors += 1;
+      continue;
+    }
+    const token = getDeductionToken(tokenId);
+    if (!token || token.category !== slot) {
+      typeErrors += 1;
+      continue;
+    }
+    if (tokenId !== deductionAnswer[slot]) logicErrors += 1;
+  }
+
+  return { typeErrors, logicErrors };
+}
+
+export function shouldRevealDeductionTypes(failedSubmissions: number) {
+  return Number.isFinite(failedSubmissions) && failedSubmissions >= 2;
+}
+
+export function isDeductionSolved(values: DeductionPlacement) {
+  const result = evaluateDeductionPlacement(values);
+  return result.typeErrors === 0 && result.logicErrors === 0;
 }

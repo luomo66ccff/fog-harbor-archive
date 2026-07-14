@@ -10,3 +10,4 @@ outputs
 work
 .env*
 npm-debug.log*
+design-assets/source
