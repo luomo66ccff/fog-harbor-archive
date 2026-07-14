@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "./responsive.css";
+import "./puzzle-upgrade.css";
+import "./visual-upgrade.css";
+import "./evidence-upgrade.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://fog-harbor-archive.luomo.moe"),

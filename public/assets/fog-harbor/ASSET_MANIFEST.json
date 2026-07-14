@@ -1,0 +1,112 @@
+[
+  {
+    "id": "bg-investigation-room",
+    "png": "/assets/fog-harbor/bg-investigation-room.png",
+    "webp": "/assets/fog-harbor/bg-investigation-room.webp",
+    "width": 1672,
+    "height": 941,
+    "sha256_png": "3279b76a0173a35465370e517e6c8523ac1a788874a72e065bae6ef81bdfbf45",
+    "role": "调查桌面主背景",
+    "component": "components/desktop/InvestigationDesktop.tsx",
+    "notes": "作为底层场景图，叠加雨滴、雾、玻璃水痕和轻微鼠标视差。"
+  },
+  {
+    "id": "puzzle-cctv-pier7",
+    "png": "/assets/fog-harbor/puzzle-cctv-pier7.png",
+    "webp": "/assets/fog-harbor/puzzle-cctv-pier7.webp",
+    "width": 1448,
+    "height": 1086,
+    "sha256_png": "23f4f2c92402481edf29ce49358aca55b9c1c4adff55eb4a7f14eb4932b98c33",
+    "role": "六码头照片拼图与放大观察",
+    "component": "components/puzzles/PhotoPuzzle.tsx",
+    "notes": "切成 3×2 六片；解谜后设置船号与第二道人影的热点。覆盖或重绘生成图中的时间戳。"
+  },
+  {
+    "id": "map-harbor-investigation",
+    "png": "/assets/fog-harbor/map-harbor-investigation.png",
+    "webp": "/assets/fog-harbor/map-harbor-investigation.webp",
+    "width": 1448,
+    "height": 1086,
+    "sha256_png": "42cb17d169a9c623a56cbb5ce0f6ed6b4fa9186ded7307d0ef2eec7cffe427e8",
+    "role": "港区地图",
+    "component": "components/windows/RecordsWindows.tsx / MapWindow",
+    "notes": "作为地图底图，HTML/SVG 覆盖中文地点名称、可点击热点和调查状态。"
+  },
+  {
+    "id": "document-case-folder",
+    "png": "/assets/fog-harbor/document-case-folder.png",
+    "webp": "/assets/fog-harbor/document-case-folder.webp",
+    "width": 1086,
+    "height": 1448,
+    "sha256_png": "548a5de5358d2788c939169891ecb15125df186a32d665b9c3591364924ba604",
+    "role": "档案封面/未打开档案状态",
+    "component": "components/windows/ArchiveWindow.tsx",
+    "notes": "适合档案目录封面、最终档案封套或加载过渡。"
+  },
+  {
+    "id": "document-case-summary",
+    "png": "/assets/fog-harbor/document-case-summary.png",
+    "webp": "/assets/fog-harbor/document-case-summary.webp",
+    "width": 1086,
+    "height": 1448,
+    "sha256_png": "acf2aac92b70d9a94cf1c218d90a33a7151513524f724a0f0ad8e29e136791f9",
+    "role": "案件摘要纸张材质",
+    "component": "components/windows/ArchiveWindow.tsx",
+    "notes": "仅作纸张与印章背景；正式中文文本必须用 HTML 覆盖。"
+  },
+  {
+    "id": "document-duty-roster",
+    "png": "/assets/fog-harbor/document-duty-roster.png",
+    "webp": "/assets/fog-harbor/document-duty-roster.webp",
+    "width": 1086,
+    "height": 1448,
+    "sha256_png": "2f489e13ac62762806016c81d3dd5951f142e4daa05108749e98d2cd7d78d821",
+    "role": "夜班签到与校时表材质",
+    "component": "components/windows/ArchiveWindow.tsx / SchedulePuzzle.tsx",
+    "notes": "生成图数字只作视觉纹理，真实 00:31/00:42 等数据用代码渲染。"
+  },
+  {
+    "id": "document-shipping-manifest",
+    "png": "/assets/fog-harbor/document-shipping-manifest.png",
+    "webp": "/assets/fog-harbor/document-shipping-manifest.webp",
+    "width": 1086,
+    "height": 1448,
+    "sha256_png": "503d3697b8c6b37ef2aa44d8a5c2cd37d5cde03580175c77555d266987e476df",
+    "role": "进港记录与货物清单材质",
+    "component": "components/windows/ArchiveWindow.tsx",
+    "notes": "生成图含非剧情年份和英文，应降低背景透明度或局部裁切，覆盖真实内容。"
+  },
+  {
+    "id": "document-weather-log",
+    "png": "/assets/fog-harbor/document-weather-log.png",
+    "webp": "/assets/fog-harbor/document-weather-log.webp",
+    "width": 1086,
+    "height": 1448,
+    "sha256_png": "abda7a37463bea0097cd1f8455efd3f4313df596bdc802386f1fad3ff0f5a514",
+    "role": "自动气象站原始日志材质",
+    "component": "components/windows/ArchiveWindow.tsx / SchedulePuzzle.tsx",
+    "notes": "适合叠加真实传感器数据与“降水 0.0mm”异常提示。"
+  },
+  {
+    "id": "device-tape-recorder",
+    "png": "/assets/fog-harbor/device-tape-recorder.png",
+    "webp": "/assets/fog-harbor/device-tape-recorder.webp",
+    "width": 1448,
+    "height": 1086,
+    "sha256_png": "bf1af0c2b9774bb53709d26c17d9e718ff03790274cf85b2a09fc91903237b0f",
+    "role": "录音带修复工作台",
+    "component": "components/windows/UtilityWindows.tsx / AudioWindow",
+    "notes": "交互旋钮、播放头、波形、VU 表应由 HTML/CSS/SVG 覆盖，图片只作机器底图。"
+  },
+  {
+    "id": "room-surveillance-wall",
+    "png": "/assets/fog-harbor/room-surveillance-wall.png",
+    "webp": "/assets/fog-harbor/room-surveillance-wall.webp",
+    "width": 1448,
+    "height": 1086,
+    "sha256_png": "f10b3d87bf98081838ad5164d2b20d4bb6a34f101568ebdb5f7f71233e1ce35b",
+    "role": "监控室窗口",
+    "component": "components/windows/UtilityWindows.tsx / SurveillanceWindow",
+    "notes": "将中央屏幕设置为可交互区域；生成图中的日期应由 CSS 遮罩并覆盖为剧情时间。"
+  }
+]

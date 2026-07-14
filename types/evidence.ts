@@ -1,5 +1,14 @@
 export type EvidenceVerdict = "unmarked" | "credible" | "doubtful" | "forged";
 
+export type EvidenceRelationKind = "supports" | "contradicts";
+
+export interface EvidenceRelationSelection {
+  supports: string[];
+  contradicts: string[];
+}
+
+export type EvidenceRelations = Record<string, EvidenceRelationSelection>;
+
 export interface Evidence {
   id: string;
   index: string;
@@ -15,4 +24,3 @@ export interface Evidence {
   unlockAfter?: "schedule" | "frequency" | "photo" | "deduction" | "hidden";
   relatedEvidence: string[];
 }
-

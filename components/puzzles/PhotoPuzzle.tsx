@@ -1,152 +1,168 @@
 "use client";
 
-import { DragEvent, KeyboardEvent as ReactKeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
-import { Check, RotateCw, Search, X, ZoomIn } from "lucide-react";
+import { DragEvent, KeyboardEvent, useEffect, useRef, useState, type CSSProperties } from "react";
+import { Check, Image as ImageIcon, ScanLine, Search } from "lucide-react";
+import "@/app/puzzle-upgrade.css";
 import { useFogAudio } from "@/components/audio/AudioProvider";
+import { PhotoInspection } from "@/components/puzzles/PhotoInspection";
 import { puzzleGuidance } from "@/lib/case-data";
-import { isPhotoSolved, normalizeRotation } from "@/lib/puzzle-engine";
+import {
+  PHOTO_PIECE_IDS,
+  countMisplacedPhotoPieces,
+  movePhotoPiece,
+  photoPieceAtSlot,
+  shufflePhotoPieces,
+} from "@/lib/puzzle-engine";
+import { visualAssets } from "@/lib/visual-assets";
 import { useCaseStore } from "@/store/case-store";
-import type { PhotoPieceState } from "@/types/puzzle";
+import type { PhotoPieceState, PhotoPuzzleStage } from "@/types/puzzle";
 
-const initialPieces: PhotoPieceState[] = [
-  { id: 0, slot: null, rotation: 90 }, { id: 1, slot: null, rotation: 270 }, { id: 2, slot: null, rotation: 180 },
-  { id: 3, slot: null, rotation: 90 }, { id: 4, slot: null, rotation: 270 }, { id: 5, slot: null, rotation: 180 },
-];
+function pieceStyle(piece: PhotoPieceState): CSSProperties {
+  const column = piece.id % 3;
+  const row = Math.floor(piece.id / 3);
+  return {
+    "--photo-slice": `url("${visualAssets.cctvPuzzle}")`,
+    "--slice-x": `${column * 50}%`,
+    "--slice-y": `${row * 100}%`,
+  } as CSSProperties;
+}
+
+function targetSlotForKey(slot: number, key: string) {
+  const column = slot % 3;
+  const row = Math.floor(slot / 3);
+  if (key === "ArrowLeft" && column > 0) return slot - 1;
+  if (key === "ArrowRight" && column < 2) return slot + 1;
+  if (key === "ArrowUp" && row > 0) return slot - 3;
+  if (key === "ArrowDown" && row < 1) return slot + 3;
+  return null;
+}
 
 export function PhotoPuzzle() {
   const solved = useCaseStore((state) => state.completedPuzzles.includes("photo"));
   const completePuzzle = useCaseStore((state) => state.completePuzzle);
   const recordAttempt = useCaseStore((state) => state.recordAttempt);
   const { cue } = useFogAudio();
-  const [pieces, setPieces] = useState(initialPieces);
+  const [pieces, setPieces] = useState<PhotoPieceState[]>(() => shufflePhotoPieces());
   const [selected, setSelected] = useState<number | null>(null);
-  const [feedback, setFeedback] = useState("先选择碎片，再选择槽位；也可直接拖动。方向不正时请旋转。");
-  const [zoomed, setZoomed] = useState(false);
-  const zoomTriggerRef = useRef<HTMLButtonElement>(null);
+  const [stage, setStage] = useState<PhotoPuzzleStage>("assembling");
+  const [feedback, setFeedback] = useState("选择一块照片，再选择目标位置进行交换；也可拖动或使用方向键。");
   const [hintIndex, setHintIndex] = useState(-1);
-  const complete = useMemo(() => isPhotoSolved(pieces), [pieces]);
+  const slotRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const scanTimer = useRef<number | null>(null);
 
-  const closeZoom = () => {
-    setZoomed(false);
-    window.requestAnimationFrame(() => zoomTriggerRef.current?.focus());
-  };
+  useEffect(() => () => {
+    if (scanTimer.current !== null) window.clearTimeout(scanTimer.current);
+  }, []);
 
-  useEffect(() => {
-    if (complete && !solved) {
-      completePuzzle("photo");
-      cue("unlock");
-    }
-  }, [complete, completePuzzle, cue, solved]);
-
-  const rotate = (id: number) => {
-    setPieces((items) => items.map((item) => item.id === id ? { ...item, rotation: normalizeRotation(item.rotation + 90) } : item));
+  const swapIntoSlot = (pieceId: number, targetSlot: number, keepSelected = false) => {
+    setPieces((current) => movePhotoPiece(current, pieceId, targetSlot));
+    setSelected(keepSelected ? pieceId : null);
+    setFeedback("碎片已交换。系统不会提前指出对错，请在整体成像后统一扫描。");
     cue("paper");
   };
 
-  const place = (id: number, slot: number) => {
-    recordAttempt("photo");
-    if (id !== slot) {
-      setFeedback("边缘纹理没有咬合，这一片不属于这里。观察岸灯横线与船体水线。");
-      cue("error");
+  const selectOrSwap = (piece: PhotoPieceState) => {
+    if (selected === null) {
+      setSelected(piece.id);
+      setFeedback("已夹取一块碎片。选择另一位置即可交换。");
+      cue("paper");
       return;
     }
-    setPieces((items) => items.map((item) => item.id === id ? { ...item, slot } : item));
-    setSelected(null);
-    setFeedback("位置吻合。若碎片仍倾斜，请把角度旋回 0°。");
-    cue("paper");
+    if (selected === piece.id) {
+      setSelected(null);
+      setFeedback("已放回碎片。");
+      return;
+    }
+    swapIntoSlot(selected, piece.slot);
   };
 
   const onDrop = (event: DragEvent<HTMLDivElement>, slot: number) => {
     event.preventDefault();
     const id = Number(event.dataTransfer.getData("text/photo-piece"));
-    if (!Number.isNaN(id)) place(id, slot);
+    if (!Number.isNaN(id)) swapIntoSlot(id, slot);
+  };
+
+  const onSlotKeyDown = (event: KeyboardEvent<HTMLButtonElement>, piece: PhotoPieceState) => {
+    const target = targetSlotForKey(piece.slot, event.key);
+    if (target === null) return;
+    event.preventDefault();
+    const movingId = selected ?? piece.id;
+    swapIntoSlot(movingId, target, true);
+    window.requestAnimationFrame(() => slotRefs.current[target]?.focus());
+  };
+
+  const scanRestoration = () => {
+    recordAttempt("photo");
+    const misplaced = countMisplacedPhotoPieces(pieces);
+    if (misplaced > 0) {
+      setFeedback(`扫描未通过：共有 ${misplaced} 块碎片错位。系统不会标记具体位置，请根据灯杆、船体与水线连续性调整。`);
+      cue("error");
+      return;
+    }
+    setSelected(null);
+    setStage("scanning");
+    setFeedback("六块底片边缘吻合，正在执行统一扫描复原……");
+    cue("tape");
+    scanTimer.current = window.setTimeout(() => {
+      setStage("inspecting");
+      scanTimer.current = null;
+    }, 920);
+  };
+
+  const finishInspection = () => {
+    completePuzzle("photo");
+    cue("unlock");
   };
 
   if (solved) {
     return (
-      <section className="solved-photo-panel">
-        <div className="puzzle-success"><Check size={20} aria-hidden="true" /><div><strong>照片已完成拼合</strong><p>白鹭七号 / H-1707。水面倒影显示林知夏落水后仍有第二道人影靠近检修梯。</p></div></div>
-        <button ref={zoomTriggerRef} type="button" className="assembled-photo" onClick={() => setZoomed(true)} aria-label="放大查看复原照片"><PhotoScene /><span><ZoomIn size={18} /> 放大观察隐藏细节</span></button>
-        {zoomed && <PhotoModal onClose={closeZoom} />}
+      <section className="solved-photo-panel solved-photo-panel--upgraded">
+        <div className="puzzle-success"><Check size={20} aria-hidden="true" /><div><strong>照片与现场细节已核验</strong><p>白鹭七号 / H-1707。水线外侧的第二道人影证明林知夏落水后仍有人靠近检修梯。</p></div></div>
+        <div className="photo-complete-preview" style={{ "--photo-complete": `url("${visualAssets.cctvPuzzle}")` } as CSSProperties} role="img" aria-label="复原的第七码头照片，船体编号 H-1707，码头外侧有第二道人影"><span>H-1707 / 第二道人影已登记</span></div>
       </section>
     );
   }
 
+  if (stage === "inspecting") return <PhotoInspection onComplete={finishInspection} />;
+
   return (
-    <section className="puzzle-panel photo-puzzle" aria-labelledby="photo-title">
-      <div className="puzzle-heading"><div><p className="eyebrow">PUZZLE 03 / TORN PHOTOGRAPH</p><h3 id="photo-title">撕碎的港口照片</h3></div><span className="photo-index">6 PIECES</span></div>
-      <p className="puzzle-brief">把六片照片拖入正确位置并校正方向。移动端可“点碎片 → 点槽位”，每片旁都有旋转按钮。</p>
-      <div className="photo-workbench">
-        <div className="piece-tray" aria-label="未放置照片碎片">
-          {pieces.filter((piece) => piece.slot === null).map((piece) => <PieceCard key={piece.id} piece={piece} selected={selected === piece.id} onSelect={() => setSelected(piece.id)} onRotate={() => rotate(piece.id)} />)}
-          {pieces.every((piece) => piece.slot !== null) && <p>所有碎片已上板，检查旋转角度。</p>}
-        </div>
-        <div className="photo-board" aria-label="照片拼合区域">
-          {Array.from({ length: 6 }, (_, slot) => {
-            const piece = pieces.find((item) => item.slot === slot);
-            return (
-              <div key={slot} className={`photo-slot ${piece ? "has-piece" : ""}`} onDragOver={(event) => event.preventDefault()} onDrop={(event) => onDrop(event, slot)}>
-                <button type="button" className="photo-slot-target" onClick={() => { if (selected !== null) place(selected, slot); }} aria-label={`照片槽位 ${slot + 1}${piece ? `，已有碎片 ${piece.id + 1}` : ""}`}>
-                  {piece ? <span className={`piece-visual piece-${piece.id}`} style={{ transform: `rotate(${piece.rotation}deg)` }}><i>{piece.id === 4 ? "H-1" : piece.id === 5 ? "707" : ""}</i></span> : <span className="slot-number">{slot + 1}</span>}
-                </button>
-                {piece && <button type="button" className="slot-rotate" onClick={() => rotate(piece.id)} aria-label={`旋转碎片 ${piece.id + 1}`}><RotateCw size={14} /> {normalizeRotation(piece.rotation)}°</button>}
-              </div>
-            );
-          })}
-        </div>
+    <section className={`puzzle-panel photo-puzzle photo-puzzle--upgraded ${stage === "scanning" ? "is-scanning" : ""}`} aria-labelledby="photo-title">
+      <div className="puzzle-heading"><div><p className="eyebrow">PUZZLE 03 / 3×2 FRAME RESTORATION</p><h3 id="photo-title">密封的港口监控照片</h3></div><ImageIcon size={23} aria-hidden="true" /></div>
+      <p className="puzzle-brief">六块真实图像切片已随机打乱。错误位置也可以放置；交换完成后点击“扫描复原”，系统只报告错位总数。</p>
+
+      <div className="photo-scan-bed" aria-label="三列两行照片拼图" aria-busy={stage === "scanning"}>
+        {PHOTO_PIECE_IDS.map((slot) => {
+          const piece = photoPieceAtSlot(pieces, slot);
+          if (!piece) return <div key={slot} className="photo-scan-slot is-empty" />;
+          const row = Math.floor(slot / 3) + 1;
+          const column = (slot % 3) + 1;
+          return (
+            <div key={slot} className="photo-scan-slot" onDragOver={(event) => event.preventDefault()} onDrop={(event) => onDrop(event, slot)}>
+              <button
+                ref={(node) => { slotRefs.current[slot] = node; }}
+                type="button"
+                draggable={stage === "assembling"}
+                className={`photo-slice ${selected === piece.id ? "is-selected" : ""}`}
+                style={pieceStyle(piece)}
+                onDragStart={(event) => event.dataTransfer.setData("text/photo-piece", String(piece.id))}
+                onClick={() => selectOrSwap(piece)}
+                onKeyDown={(event) => onSlotKeyDown(event, piece)}
+                disabled={stage !== "assembling"}
+                aria-pressed={selected === piece.id}
+                aria-label={`照片切片，当前位于第 ${row} 行第 ${column} 列；按回车选择，或用方向键与相邻切片交换`}
+              />
+            </div>
+          );
+        })}
+        {stage === "scanning" && <div className="photo-scan-pass" aria-hidden="true"><span /></div>}
       </div>
-      <p className="puzzle-feedback" role="status">{feedback}</p>
+
+      <div className="photo-scan-footer">
+        <p className="puzzle-feedback" role="status">{feedback}</p>
+        <button type="button" className="primary-action" onClick={scanRestoration} disabled={stage !== "assembling"}><ScanLine size={16} /> {stage === "scanning" ? "扫描中…" : "扫描复原"}</button>
+      </div>
       <button type="button" className="hint-button" onClick={() => setHintIndex((value) => Math.min(value + 1, puzzleGuidance.photo.length - 1))}><Search size={14} aria-hidden="true" /> 请求渐进提示</button>
       {hintIndex >= 0 && <p className="hint-copy">提示 {hintIndex + 1}：{puzzleGuidance.photo[hintIndex]}</p>}
     </section>
-  );
-}
-
-function PieceCard({ piece, selected, onSelect, onRotate }: { piece: PhotoPieceState; selected: boolean; onSelect: () => void; onRotate: () => void }) {
-  return (
-    <div className={`piece-card ${selected ? "is-selected" : ""}`}>
-      <button type="button" draggable onDragStart={(event) => event.dataTransfer.setData("text/photo-piece", String(piece.id))} onClick={onSelect} aria-pressed={selected} aria-label={`选择照片碎片 ${piece.id + 1}`}><span className={`piece-visual piece-${piece.id}`} style={{ transform: `rotate(${piece.rotation}deg)` }}><i>{piece.id === 4 ? "H-1" : piece.id === 5 ? "707" : ""}</i></span></button>
-      <button type="button" className="piece-rotate" onClick={onRotate} aria-label={`旋转照片碎片 ${piece.id + 1}`}><RotateCw size={13} /> {normalizeRotation(piece.rotation)}°</button>
-    </div>
-  );
-}
-
-function PhotoScene() {
-  return <div className="photo-scene" aria-hidden="true"><span className="harbor-lamp lamp-a" /><span className="harbor-lamp lamp-b" /><span className="ship-body"><b>H-1707</b></span><span className="human-shadow" /><span className="water-reflection" /><span className="shore-clock">00:31</span></div>;
-}
-
-function PhotoModal({ onClose }: { onClose: () => void }) {
-  const dialogRef = useRef<HTMLDivElement>(null);
-  const closeRef = useRef<HTMLButtonElement>(null);
-
-  useEffect(() => {
-    closeRef.current?.focus();
-  }, []);
-
-  const trapFocus = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      event.stopPropagation();
-      onClose();
-      return;
-    }
-    if (event.key !== "Tab") return;
-    const focusable = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>("button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])") ?? []);
-    if (focusable.length === 0) return;
-    const first = focusable[0];
-    const last = focusable.at(-1);
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault();
-      last?.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault();
-      first.focus();
-    }
-  };
-
-  return (
-    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="复原港口照片细节">
-      <div ref={dialogRef} className="photo-modal" onKeyDown={trapFocus}><button ref={closeRef} type="button" className="modal-close" onClick={onClose} aria-label="关闭照片"><X size={18} /></button><PhotoScene /><div className="photo-annotations"><span>船号 / H-1707</span><span>岸钟倒影 / 00:31</span><span>检修梯 / 第二道人影</span></div></div>
-    </div>
   );
 }
