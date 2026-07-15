@@ -11,16 +11,32 @@ import type {
 } from "@/types/case";
 import type { EvidenceRelationKind, EvidenceRelations, EvidenceVerdict } from "@/types/evidence";
 import type {
+  AmbientEventId,
+  CinematicEventId,
   EasterEggId,
   NarrativeEventId,
   NarrativeState,
   ProvisionalTheoryState,
+  RunMemory,
   SecondFigureTheory,
 } from "@/types/narrative";
 import { evidence, initialEvidenceIds, puzzleRewards } from "@/lib/evidence-data";
 import { isEasterEggId, recordEasterEggDiscovery } from "@/lib/easter-egg-engine";
-import { isNarrativeEventId } from "@/lib/narrative-engine";
+import {
+  normalizeNarrativeEventId,
+} from "@/lib/narrative-engine";
+import {
+  deriveSeenCinematicEvents,
+  isCinematicEventId,
+} from "@/lib/cinematic-engine";
+import {
+  isAmbientEventId,
+  MAX_AMBIENT_EVENTS_PER_RUN,
+  nextAmbientSeed,
+  normalizeAmbientSeed,
+} from "@/lib/ambient-event-engine";
 import { useWindowStore } from "@/store/window-store";
+import type { InvestigationRunSnapshot } from "@/lib/investigation-log";
 
 export const SAVE_KEY = "fog-harbor-save-v1";
 
@@ -37,6 +53,8 @@ interface CaseState extends NarrativeState {
   bootSeen: boolean;
   runCount: number;
   completedRuns: number;
+  runHistory: InvestigationRunSnapshot[];
+  runEndedAt: number | null;
   completedPuzzles: PuzzleId[];
   unlockedEvidenceIds: string[];
   readDocumentIds: string[];
@@ -71,6 +89,8 @@ interface CaseState extends NarrativeState {
   recordAttempt: (id: PuzzleId) => void;
   markTaskProgress: (taskId: InvestigationTaskId, itemId: string) => void;
   markNarrativeEventSeen: (id: NarrativeEventId) => void;
+  markCinematicEventSeen: (id: CinematicEventId) => void;
+  markAmbientEventSeen: (id: AmbientEventId) => void;
   discoverEasterEgg: (id: EasterEggId) => void;
   setSecondFigureTheory: (value: SecondFigureTheory) => void;
   setAssistedInvestigation: (value: boolean) => void;
@@ -91,6 +111,8 @@ export type PersistedCaseState = Pick<
   | "bootSeen"
   | "runCount"
   | "completedRuns"
+  | "runHistory"
+  | "runEndedAt"
   | "completedPuzzles"
   | "unlockedEvidenceIds"
   | "readDocumentIds"
@@ -108,9 +130,15 @@ export type PersistedCaseState = Pick<
   | "puzzleAttempts"
   | "taskProgress"
   | "seenNarrativeEvents"
+  | "runNarrativeEventIds"
   | "discoveredEasterEggs"
+  | "runDiscoveredEasterEggIds"
+  | "seenCinematicEvents"
+  | "ambientEventSeed"
+  | "seenAmbientEvents"
   | "provisionalTheory"
   | "theoryHistory"
+  | "runMemory"
   | "assistedInvestigation"
   | "runStartedAt"
   | "audio"
@@ -121,6 +149,7 @@ const puzzleIds = new Set<PuzzleId>(["schedule", "frequency", "photo", "deductio
 const endingIds = new Set<EndingId>(["truth", "trade", "seventh"]);
 const evidenceVerdicts = new Set<EvidenceVerdict>(["unmarked", "credible", "doubtful", "forged"]);
 const criticalEvidenceIds = new Set(evidence.filter((item) => item.critical).map((item) => item.id));
+const MAX_DATE_MS = 8_640_000_000_000_000;
 const investigationTaskIds = new Set<InvestigationTaskId>([
   "restore-time",
   "repair-call",
@@ -160,15 +189,36 @@ function endingArrayOr(value: unknown, fallback: EndingId[]): EndingId[] {
 }
 
 function narrativeEventArrayOr(value: unknown, fallback: NarrativeEventId[] = []): NarrativeEventId[] {
-  return Array.isArray(value)
-    ? unique(value.filter(isNarrativeEventId))
-    : [...fallback];
+  if (!Array.isArray(value)) return [...fallback];
+  return unique(
+    value
+      .map(normalizeNarrativeEventId)
+      .filter((id): id is NarrativeEventId => id !== null),
+  );
 }
 
 function easterEggArrayOr(value: unknown, fallback: EasterEggId[] = []): EasterEggId[] {
   return Array.isArray(value)
     ? unique(value.filter(isEasterEggId))
     : [...fallback];
+}
+
+function cinematicEventArrayOr(
+  value: unknown,
+  fallback: CinematicEventId[] = [],
+): CinematicEventId[] {
+  return Array.isArray(value)
+    ? unique(value.filter(isCinematicEventId))
+    : [...fallback];
+}
+
+function ambientEventArrayOr(
+  value: unknown,
+  fallback: AmbientEventId[] = [],
+): AmbientEventId[] {
+  return Array.isArray(value)
+    ? unique(value.filter(isAmbientEventId)).slice(0, MAX_AMBIENT_EVENTS_PER_RUN)
+    : [...fallback].slice(0, MAX_AMBIENT_EVENTS_PER_RUN);
 }
 
 function isSecondFigureTheory(value: unknown): value is SecondFigureTheory {
@@ -200,8 +250,67 @@ function theoryHistoryOr(value: unknown, fallback: string[] = []): string[] {
   return value.filter(isTheoryHistoryEntry).slice(-64);
 }
 
+function hasTheoryCorrection(history: readonly string[]): boolean {
+  return history.some((entry) => entry.includes("->"));
+}
+
+function runMemoryOr(
+  value: unknown,
+  fallback: RunMemory | undefined,
+  legacyState: {
+    theoryHistory: readonly string[];
+    endingsSeen: readonly EndingId[];
+    discoveredEasterEggs: readonly EasterEggId[];
+  },
+): RunMemory {
+  const baseline = fallback ?? {
+    correctedTheoryBefore: false,
+    endingsSeenAtRunStart: [],
+    easterEggCountAtRunStart: 0,
+  };
+  if (!isRecord(value)) {
+    return {
+      correctedTheoryBefore: hasTheoryCorrection(legacyState.theoryHistory),
+      endingsSeenAtRunStart: [...legacyState.endingsSeen],
+      easterEggCountAtRunStart: legacyState.discoveredEasterEggs.length,
+    };
+  }
+
+  return {
+    correctedTheoryBefore: typeof value.correctedTheoryBefore === "boolean"
+      ? value.correctedTheoryBefore
+      : baseline.correctedTheoryBefore,
+    endingsSeenAtRunStart: endingArrayOr(
+      value.endingsSeenAtRunStart,
+      baseline.endingsSeenAtRunStart,
+    ),
+    easterEggCountAtRunStart: typeof value.easterEggCountAtRunStart === "number"
+      && Number.isInteger(value.easterEggCountAtRunStart)
+      && value.easterEggCountAtRunStart >= 0
+      && value.easterEggCountAtRunStart <= 8
+      ? value.easterEggCountAtRunStart
+      : baseline.easterEggCountAtRunStart,
+  };
+}
+
+function ambientEventSeedOr(value: unknown, fallback: number): number {
+  return typeof value === "number"
+    && Number.isSafeInteger(value)
+    && value > 0
+    && value <= 0xffff_ffff
+    ? normalizeAmbientSeed(value)
+    : normalizeAmbientSeed(fallback);
+}
+
 function runStartedAtOr(value: unknown, fallback: number) {
-  return typeof value === "number" && Number.isFinite(value) && value > 0
+  return typeof value === "number" && Number.isFinite(value) && value > 0 && value <= MAX_DATE_MS
+    ? value
+    : fallback;
+}
+
+function runEndedAtOr(value: unknown, fallback: number | null): number | null {
+  if (value === null) return null;
+  return typeof value === "number" && Number.isFinite(value) && value > 0 && value <= MAX_DATE_MS
     ? value
     : fallback;
 }
@@ -216,6 +325,52 @@ function verdictRecordOr(value: unknown, fallback: Record<string, EvidenceVerdic
 function stringRecordOr(value: unknown, fallback: Record<string, string>): Record<string, string> {
   if (!isRecord(value)) return { ...fallback };
   return Object.fromEntries(Object.entries(value).filter((entry): entry is [string, string] => typeof entry[1] === "string"));
+}
+
+function runHistoryOr(
+  value: unknown,
+  fallback: InvestigationRunSnapshot[] = [],
+): InvestigationRunSnapshot[] {
+  if (!Array.isArray(value)) return fallback.map((run) => ({ ...run, evidenceNotes: { ...run.evidenceNotes } }));
+  const sanitized: InvestigationRunSnapshot[] = [];
+  for (const item of value.slice(-20)) {
+    if (!isRecord(item)) continue;
+    const runNumber = typeof item.runNumber === "number" && Number.isInteger(item.runNumber) && item.runNumber >= 1
+      ? item.runNumber
+      : null;
+    const startedAt = typeof item.startedAt === "number" && Number.isFinite(item.startedAt) && item.startedAt > 0 && item.startedAt <= MAX_DATE_MS
+      ? item.startedAt
+      : null;
+    if (runNumber === null || startedAt === null) continue;
+    const endingId = item.endingId === null || isEndingId(item.endingId) ? item.endingId : null;
+    const discoveredIds = easterEggArrayOr(item.discoveredEasterEggIds);
+    sanitized.push({
+      runNumber,
+      startedAt,
+      endedAt: typeof item.endedAt === "number" && Number.isFinite(item.endedAt) && item.endedAt >= startedAt && item.endedAt <= MAX_DATE_MS
+        ? item.endedAt
+        : undefined,
+      completedPuzzles: puzzleArrayOr(item.completedPuzzles, []),
+      unlockedEvidenceIds: stringArrayOr(item.unlockedEvidenceIds),
+      readDocumentIds: stringArrayOr(item.readDocumentIds),
+      readMessageIds: stringArrayOr(item.readMessageIds),
+      readEvidenceIds: stringArrayOr(item.readEvidenceIds),
+      evidenceNotes: stringRecordOr(item.evidenceNotes, {}),
+      caseNote: typeof item.caseNote === "string" ? item.caseNote.slice(0, 24_000) : "",
+      puzzleAttempts: puzzleAttemptsOr(item.puzzleAttempts, {}),
+      narrativeEventIds: narrativeEventArrayOr(item.narrativeEventIds),
+      theoryHistory: theoryHistoryOr(item.theoryHistory),
+      discoveredEasterEggCount: typeof item.discoveredEasterEggCount === "number" && Number.isInteger(item.discoveredEasterEggCount)
+        ? Math.max(0, Math.min(8, item.discoveredEasterEggCount))
+        : discoveredIds.length,
+      discoveredEasterEggIds: discoveredIds,
+      assistedInvestigation: item.assistedInvestigation === true,
+      endingId,
+    });
+  }
+  const byRun = new Map<number, InvestigationRunSnapshot>();
+  sanitized.forEach((run) => byRun.set(run.runNumber, run));
+  return [...byRun.values()].sort((left, right) => left.runNumber - right.runNumber).slice(-20);
 }
 
 function evidenceRelationsOr(value: unknown, fallback: EvidenceRelations = {}): EvidenceRelations {
@@ -291,6 +446,8 @@ function persistedSnapshot(state: CaseState): PersistedCaseState {
     bootSeen: state.bootSeen,
     runCount: state.runCount,
     completedRuns: state.completedRuns,
+    runHistory: state.runHistory,
+    runEndedAt: state.runEndedAt,
     completedPuzzles: state.completedPuzzles,
     unlockedEvidenceIds: state.unlockedEvidenceIds,
     readDocumentIds: state.readDocumentIds,
@@ -308,9 +465,15 @@ function persistedSnapshot(state: CaseState): PersistedCaseState {
     puzzleAttempts: state.puzzleAttempts,
     taskProgress: state.taskProgress,
     seenNarrativeEvents: state.seenNarrativeEvents,
+    runNarrativeEventIds: state.runNarrativeEventIds,
     discoveredEasterEggs: state.discoveredEasterEggs,
+    runDiscoveredEasterEggIds: state.runDiscoveredEasterEggIds,
+    seenCinematicEvents: state.seenCinematicEvents,
+    ambientEventSeed: state.ambientEventSeed,
+    seenAmbientEvents: state.seenAmbientEvents,
     provisionalTheory: state.provisionalTheory,
     theoryHistory: state.theoryHistory,
+    runMemory: state.runMemory,
     assistedInvestigation: state.assistedInvestigation,
     runStartedAt: state.runStartedAt,
     audio: state.audio,
@@ -327,18 +490,56 @@ export function sanitizePersistedCaseState(
   const hasReviewState = Object.prototype.hasOwnProperty.call(source, "evidenceReviewTouchedIds")
     || Object.prototype.hasOwnProperty.call(source, "legacyVerifiedEvidenceIds")
     || Object.prototype.hasOwnProperty.call(source, "evidenceRelations");
+  const completedPuzzles = puzzleArrayOr(source.completedPuzzles, fallback.completedPuzzles);
+  const currentEnding = source.currentEnding === null || isEndingId(source.currentEnding)
+    ? source.currentEnding
+    : fallback.currentEnding;
+  const endingsSeen = endingArrayOr(source.endingsSeen, fallback.endingsSeen);
+  const runCount = typeof source.runCount === "number" && Number.isInteger(source.runCount) && source.runCount >= 1
+    ? source.runCount
+    : fallback.runCount;
+  const runHistory = runHistoryOr(source.runHistory, fallback.runHistory ?? []);
+  const seenNarrativeEvents = narrativeEventArrayOr(
+    source.seenNarrativeEvents,
+    fallback.seenNarrativeEvents,
+  );
+  const discoveredEasterEggs = easterEggArrayOr(
+    source.discoveredEasterEggs,
+    fallback.discoveredEasterEggs,
+  );
+  const theoryHistory = theoryHistoryOr(source.theoryHistory, fallback.theoryHistory);
+  const sanitizedCinematicEvents = Object.prototype.hasOwnProperty.call(source, "seenCinematicEvents")
+    ? cinematicEventArrayOr(source.seenCinematicEvents, fallback.seenCinematicEvents)
+    : deriveSeenCinematicEvents({
+      completedPuzzles,
+      theoryHistory,
+      seenNarrativeEvents,
+      currentEnding,
+    });
+  const seenCinematicEvents = unique([
+    ...sanitizedCinematicEvents,
+    ...(runCount >= 2 && seenNarrativeEvents.includes("external-reader-detected")
+      ? ["external-reader" as const]
+      : []),
+  ]);
+  const runNarrativeEventIds = Object.prototype.hasOwnProperty.call(source, "runNarrativeEventIds")
+    ? narrativeEventArrayOr(source.runNarrativeEventIds, fallback.runNarrativeEventIds ?? [])
+    : (runHistory.length === 0 ? [...seenNarrativeEvents] : []);
+  const runDiscoveredEasterEggIds = Object.prototype.hasOwnProperty.call(source, "runDiscoveredEasterEggIds")
+    ? easterEggArrayOr(source.runDiscoveredEasterEggIds, fallback.runDiscoveredEasterEggIds ?? [])
+    : (runHistory.length === 0 ? [...discoveredEasterEggs] : []);
   return {
     investigatorCode: typeof source.investigatorCode === "string"
       ? source.investigatorCode.trim().slice(0, 18)
       : fallback.investigatorCode,
     bootSeen: typeof source.bootSeen === "boolean" ? source.bootSeen : fallback.bootSeen,
-    runCount: typeof source.runCount === "number" && Number.isInteger(source.runCount) && source.runCount >= 1
-      ? source.runCount
-      : fallback.runCount,
+    runCount,
     completedRuns: typeof source.completedRuns === "number" && Number.isInteger(source.completedRuns) && source.completedRuns >= 0
       ? source.completedRuns
       : fallback.completedRuns,
-    completedPuzzles: puzzleArrayOr(source.completedPuzzles, fallback.completedPuzzles),
+    runHistory,
+    runEndedAt: runEndedAtOr(source.runEndedAt, fallback.runEndedAt ?? null),
+    completedPuzzles,
     unlockedEvidenceIds: stringArrayOr(source.unlockedEvidenceIds, fallback.unlockedEvidenceIds),
     readDocumentIds: stringArrayOr(source.readDocumentIds, fallback.readDocumentIds),
     readMessageIds: stringArrayOr(source.readMessageIds, fallback.readMessageIds),
@@ -352,14 +553,24 @@ export function sanitizePersistedCaseState(
       : readEvidenceIds.filter((id) => criticalEvidenceIds.has(id)),
     caseNote: typeof source.caseNote === "string" ? source.caseNote : fallback.caseNote,
     discoveredAnonymous: typeof source.discoveredAnonymous === "boolean" ? source.discoveredAnonymous : fallback.discoveredAnonymous,
-    currentEnding: source.currentEnding === null || isEndingId(source.currentEnding) ? source.currentEnding : fallback.currentEnding,
-    endingsSeen: endingArrayOr(source.endingsSeen, fallback.endingsSeen),
+    currentEnding,
+    endingsSeen,
     puzzleAttempts: puzzleAttemptsOr(source.puzzleAttempts, fallback.puzzleAttempts),
     taskProgress: taskProgressOr(source.taskProgress, fallback.taskProgress),
-    seenNarrativeEvents: narrativeEventArrayOr(source.seenNarrativeEvents, fallback.seenNarrativeEvents),
-    discoveredEasterEggs: easterEggArrayOr(source.discoveredEasterEggs, fallback.discoveredEasterEggs),
+    seenNarrativeEvents,
+    runNarrativeEventIds,
+    discoveredEasterEggs,
+    runDiscoveredEasterEggIds,
+    seenCinematicEvents,
+    ambientEventSeed: ambientEventSeedOr(source.ambientEventSeed, fallback.ambientEventSeed),
+    seenAmbientEvents: ambientEventArrayOr(source.seenAmbientEvents, fallback.seenAmbientEvents),
     provisionalTheory: provisionalTheoryOr(source.provisionalTheory, fallback.provisionalTheory),
-    theoryHistory: theoryHistoryOr(source.theoryHistory, fallback.theoryHistory),
+    theoryHistory,
+    runMemory: runMemoryOr(source.runMemory, fallback.runMemory, {
+      theoryHistory,
+      endingsSeen,
+      discoveredEasterEggs,
+    }),
     assistedInvestigation: typeof source.assistedInvestigation === "boolean"
       ? source.assistedInvestigation
       : (fallback.assistedInvestigation ?? false),
@@ -385,8 +596,13 @@ const freshProgress = {
   currentEnding: null as EndingId | null,
   puzzleAttempts: {} as Partial<Record<PuzzleId, number>>,
   taskProgress: {} as TaskProgress,
+  runNarrativeEventIds: [] as NarrativeEventId[],
+  runDiscoveredEasterEggIds: [] as EasterEggId[],
+  seenCinematicEvents: [] as CinematicEventId[],
+  seenAmbientEvents: [] as AmbientEventId[],
   provisionalTheory: {} as ProvisionalTheoryState,
   theoryHistory: [] as string[],
+  runEndedAt: null as number | null,
   unlockQueue: [] as UnlockEventId[],
   lastUnlock: null as string | null,
 };
@@ -403,9 +619,16 @@ export const useCaseStore = create<CaseState>()(
       bootSeen: false,
       runCount: 1,
       completedRuns: 0,
+      runHistory: [],
       endingsSeen: [],
       seenNarrativeEvents: [],
       discoveredEasterEggs: [],
+      ambientEventSeed: normalizeAmbientSeed(Date.now()),
+      runMemory: {
+        correctedTheoryBefore: false,
+        endingsSeenAtRunStart: [],
+        easterEggCountAtRunStart: 0,
+      },
       assistedInvestigation: false,
       runStartedAt: Date.now(),
       audio: { muted: false, volume: 0.42, ambient: true, interface: true },
@@ -457,12 +680,58 @@ export const useCaseStore = create<CaseState>()(
           },
         }));
       },
-      markNarrativeEventSeen: (id) => set((state) => ({
-        seenNarrativeEvents: unique([...state.seenNarrativeEvents, id]),
-      })),
-      discoverEasterEgg: (id) => set((state) => ({
-        discoveredEasterEggs: recordEasterEggDiscovery(state.discoveredEasterEggs, id),
-      })),
+      markNarrativeEventSeen: (id) => set((state) => {
+        const isNewDiscovery = !state.seenNarrativeEvents.includes(id);
+        const seenNarrativeEvents = unique([...state.seenNarrativeEvents, id]);
+        const runNarrativeEventIds = isNewDiscovery
+          ? unique([...state.runNarrativeEventIds, id])
+          : state.runNarrativeEventIds;
+        return {
+          seenNarrativeEvents,
+          runNarrativeEventIds,
+          runHistory: state.currentEnding
+            ? state.runHistory.map((run) => run.runNumber === state.runCount
+              ? { ...run, narrativeEventIds: runNarrativeEventIds }
+              : run)
+            : state.runHistory,
+        };
+      }),
+      markCinematicEventSeen: (id) => {
+        if (!isCinematicEventId(id)) return;
+        set((state) => ({
+          seenCinematicEvents: unique([...state.seenCinematicEvents, id]),
+        }));
+      },
+      markAmbientEventSeen: (id) => {
+        if (!isAmbientEventId(id)) return;
+        set((state) => {
+          if (state.seenAmbientEvents.includes(id)
+            || state.seenAmbientEvents.length >= MAX_AMBIENT_EVENTS_PER_RUN) {
+            return state;
+          }
+          return { seenAmbientEvents: [...state.seenAmbientEvents, id] };
+        });
+      },
+      discoverEasterEgg: (id) => set((state) => {
+        const isNewDiscovery = !state.discoveredEasterEggs.includes(id);
+        const discoveredEasterEggs = recordEasterEggDiscovery(state.discoveredEasterEggs, id);
+        const runDiscoveredEasterEggIds = isNewDiscovery
+          ? recordEasterEggDiscovery(state.runDiscoveredEasterEggIds, id)
+          : state.runDiscoveredEasterEggIds;
+        return {
+          discoveredEasterEggs,
+          runDiscoveredEasterEggIds,
+          runHistory: state.currentEnding
+            ? state.runHistory.map((run) => run.runNumber === state.runCount
+              ? {
+                  ...run,
+                  discoveredEasterEggCount: runDiscoveredEasterEggIds.length,
+                  discoveredEasterEggIds: runDiscoveredEasterEggIds,
+                }
+              : run)
+            : state.runHistory,
+        };
+      }),
       setSecondFigureTheory: (value) => set((state) => {
         const previous = state.provisionalTheory.secondFigure;
         if (previous === value) return state;
@@ -491,17 +760,36 @@ export const useCaseStore = create<CaseState>()(
           lastUnlock: "anonymous",
         }));
       },
-      chooseEnding: (id) => set((state) => ({
-        currentEnding: id,
-        completedRuns: state.currentEnding ? state.completedRuns : state.completedRuns + 1,
-        endingsSeen: unique([...state.endingsSeen, id]) as EndingId[],
-        seenNarrativeEvents: id === "seventh"
-          ? unique<NarrativeEventId>([...state.seenNarrativeEvents, "investigator-file-created"])
-          : state.seenNarrativeEvents,
-        discoveredEasterEggs: id === "seventh"
-          ? recordEasterEggDiscovery(state.discoveredEasterEggs, "investigator-index")
-          : state.discoveredEasterEggs,
-      })),
+      chooseEnding: (id) => set((state) => {
+        if (state.currentEnding) return state;
+        const endedAt = Date.now();
+        const snapshot: InvestigationRunSnapshot = {
+          runNumber: state.runCount,
+          startedAt: state.runStartedAt,
+          endedAt,
+          completedPuzzles: [...state.completedPuzzles],
+          unlockedEvidenceIds: [...state.unlockedEvidenceIds],
+          readDocumentIds: [...state.readDocumentIds],
+          readMessageIds: [...state.readMessageIds],
+          readEvidenceIds: [...state.readEvidenceIds],
+          evidenceNotes: { ...state.evidenceNotes },
+          caseNote: state.caseNote,
+          puzzleAttempts: { ...state.puzzleAttempts },
+          narrativeEventIds: [...state.runNarrativeEventIds],
+          theoryHistory: [...state.theoryHistory],
+          discoveredEasterEggCount: state.runDiscoveredEasterEggIds.length,
+          discoveredEasterEggIds: [...state.runDiscoveredEasterEggIds],
+          assistedInvestigation: state.assistedInvestigation,
+          endingId: id,
+        };
+        return {
+          currentEnding: id,
+          runEndedAt: endedAt,
+          runHistory: [...state.runHistory.filter((run) => run.runNumber !== state.runCount), snapshot].slice(-20),
+          completedRuns: state.completedRuns + 1,
+          endingsSeen: unique([...state.endingsSeen, id]) as EndingId[],
+        };
+      }),
       dismissUnlock: () => set({ lastUnlock: null }),
       dismissUnlockNotification: (id) => set((state) => {
         const current = state.unlockQueue[0];
@@ -517,9 +805,21 @@ export const useCaseStore = create<CaseState>()(
         bootSeen: true,
         runCount: state.runCount + 1,
         completedRuns: state.completedRuns,
+        runHistory: state.runHistory,
         endingsSeen: state.endingsSeen,
         seenNarrativeEvents: state.seenNarrativeEvents,
         discoveredEasterEggs: state.discoveredEasterEggs,
+        seenCinematicEvents: state.seenNarrativeEvents.includes("external-reader-detected")
+          || state.seenCinematicEvents.includes("external-reader")
+          ? ["external-reader"]
+          : [],
+        ambientEventSeed: nextAmbientSeed(state.ambientEventSeed),
+        runMemory: {
+          correctedTheoryBefore: state.runMemory.correctedTheoryBefore
+            || hasTheoryCorrection(state.theoryHistory),
+          endingsSeenAtRunStart: [...state.endingsSeen],
+          easterEggCountAtRunStart: state.discoveredEasterEggs.length,
+        },
         assistedInvestigation: state.assistedInvestigation,
         runStartedAt: Date.now(),
         audio: state.audio,
@@ -534,9 +834,16 @@ export const useCaseStore = create<CaseState>()(
           bootSeen: false,
           runCount: 1,
           completedRuns: 0,
+          runHistory: [],
           endingsSeen: [],
           seenNarrativeEvents: [],
           discoveredEasterEggs: [],
+          ambientEventSeed: normalizeAmbientSeed(Date.now()),
+          runMemory: {
+            correctedTheoryBefore: false,
+            endingsSeenAtRunStart: [],
+            easterEggCountAtRunStart: 0,
+          },
           assistedInvestigation: false,
           runStartedAt: Date.now(),
           audio: state.audio,

@@ -14,11 +14,23 @@ export const metadata: Metadata = {
     title: "雾港档案：失踪的第七码头",
     description: "一部可游玩的沉浸式悬疑调查档案。",
     type: "website",
-    images: [{ url: "/og-fog-harbor.png", width: 1672, height: 941, alt: "雨夜中的雾港第七码头与停泊货轮" }],
+    images: [{ url: "/og-fog-harbor.webp", width: 1672, height: 941, alt: "雨夜中的雾港第七码头与停泊货轮" }],
   },
-  twitter: { card: "summary_large_image", images: ["/og-fog-harbor.png"] },
+  twitter: { card: "summary_large_image", images: ["/og-fog-harbor.webp"] },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="zh-CN"><body>{children}</body></html>;
+  return (
+    <html lang="zh-CN">
+      <head>
+        <link
+          rel="preload"
+          as="image"
+          href="/assets/fog-harbor/bg-investigation-room.webp"
+          fetchPriority="high"
+        />
+      </head>
+      <body>{children}</body>
+    </html>
+  );
 }

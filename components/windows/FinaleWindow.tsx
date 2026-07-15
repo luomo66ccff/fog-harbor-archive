@@ -33,6 +33,7 @@ export function FinaleWindow() {
   const chooseEnding = useCaseStore((state) => state.chooseEnding);
   const markEvidenceRead = useCaseStore((state) => state.markEvidenceRead);
   const markDocumentRead = useCaseStore((state) => state.markDocumentRead);
+  const markNarrativeEventSeen = useCaseStore((state) => state.markNarrativeEventSeen);
   const { cue } = useFogAudio();
   const [candidate, setCandidate] = useState("");
   const [identityFeedback, setIdentityFeedback] = useState("");
@@ -41,7 +42,8 @@ export function FinaleWindow() {
   useEffect(() => {
     markDocumentRead("doc-final");
     markEvidenceRead("ev-final-chain");
-  }, [markDocumentRead, markEvidenceRead]);
+    markNarrativeEventSeen("external-reader-detected");
+  }, [markDocumentRead, markEvidenceRead, markNarrativeEventSeen]);
 
   const verifiedEvidenceIds = useMemo(() => getVerifiedEvidenceIds({
     visibleEvidenceIds: unlockedEvidenceIds,
@@ -77,7 +79,7 @@ export function FinaleWindow() {
   return (
     <WindowFrame id="finale" title="最终档案 / 决策节点" index="FINAL" className="max-window finale-window">
       <div className="finale-layout">
-        <article className="final-dossier"><header><span>重建卷宗</span><strong>P-07-0712 / FINAL</strong></header><p className="eyebrow">AUTHOR / 调查员 {code}</p><h2>{finalDoc.title}</h2><blockquote>{finalDoc.excerpt}</blockquote>{finalDoc.body.map((paragraph) => <p key={paragraph}>{paragraph.replaceAll("{{code}}", code)}</p>)}<aside className="external-reader-log" role="note"><span>SESSION WATCH / ARCHIVE-02</span><strong>检测到外部同步读取</strong><p>这台终端仍标记为离线。第二读取游标的身份与撤销权限均为空。</p></aside><footer><span>系统校时偏移 +11 分钟</span><span>船号 H-1707</span><span>官方天气：伪造</span></footer></article>
+        <article className="final-dossier"><header><span>重建卷宗</span><strong>P-07-0712 / FINAL</strong></header><p className="eyebrow">AUTHOR / 调查员 {code}</p><h2>{finalDoc.title}</h2><blockquote>{finalDoc.excerpt}</blockquote>{finalDoc.body.map((paragraph) => <p key={paragraph}>{paragraph.replaceAll("{{code}}", code)}</p>)}<aside className="external-reader-log" role="note"><span>SESSION WATCH / ARCHIVE-02</span><strong>当前页码已被未知节点同步读取。</strong><p>这台终端仍标记为离线。第二读取游标的身份与撤销权限均为空。</p></aside><footer><span>系统校时偏移 +11 分钟</span><span>船号 H-1707</span><span>官方天气：伪造</span></footer></article>
 
         <CaseReflection />
         {(readEvidenceIds.includes("ev-toolbox") || readEvidenceIds.includes("ev-voiceprint")) && <ProvisionalTheory correction compact />}

@@ -138,7 +138,7 @@ export function FrequencyPuzzle() {
     }
   };
 
-  if (solved) return <section className="puzzle-success"><Check size={20} aria-hidden="true" /><div><strong>纸带口令已解析</strong><p>高频脉冲解码为 0712，密封照片包与证据 E-08 已解锁。</p></div></section>;
+  if (solved) return <section className="frequency-solved"><div className="puzzle-success"><Check size={20} aria-hidden="true" /><div><strong>纸带口令已解析</strong><p>高频脉冲解码为 0712，密封照片包与证据 E-08 已解锁。</p></div></div><div className="frequency-lock-echo" aria-label="信号锁定，VU 表稳定，播放头已停止"><span>VU / STABLE</span><i /><i /><i /><i /><b /></div></section>;
 
   return (
     <section className="puzzle-panel frequency-puzzle frequency-puzzle--upgraded" aria-labelledby="frequency-title">

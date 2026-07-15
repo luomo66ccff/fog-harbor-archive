@@ -63,7 +63,11 @@ export async function seedCase(
     ...overrides,
   };
   await page.addInitScript(
-    ({ key, value }) => localStorage.setItem(key, JSON.stringify({ state: value, version: 1 })),
+    ({ key, value }) => {
+      if (!localStorage.getItem(key)) {
+        localStorage.setItem(key, JSON.stringify({ state: value, version: 1 }));
+      }
+    },
     { key: SAVE_KEY, value: state },
   );
 }
@@ -105,7 +109,19 @@ export async function dismissNarrativeEvents(page: Page) {
   throw new Error("Narrative event queue exceeded the expected 12-item safety limit.");
 }
 
+export async function dismissCinematicEvents(page: Page) {
+  for (let count = 0; count < 12; count += 1) {
+    const event = page.locator("[data-cinematic-event]").first();
+    if (!(await event.isVisible())) return;
+    const id = await event.getAttribute("data-cinematic-event");
+    await event.getByRole("button", { name: "关闭演出字幕" }).click();
+    if (id) await expect(page.locator(`[data-cinematic-event="${id}"]`)).toHaveCount(0);
+  }
+  throw new Error("Cinematic event queue exceeded the expected 12-item safety limit.");
+}
+
 async function activate(page: Page, locator: Locator, touch = false) {
+  await dismissCinematicEvents(page);
   await dismissNarrativeEvents(page);
   if (touch) {
     await locator.evaluate((element) => element.scrollIntoView({ block: "center", inline: "center" }));
@@ -131,6 +147,7 @@ async function activate(page: Page, locator: Locator, touch = false) {
 }
 
 async function openCurrentUnlock(page: Page, options: MainFlowOptions = {}) {
+  await dismissCinematicEvents(page);
   await dismissNarrativeEvents(page);
   const button = page.getByRole("button", { name: /立即打开/ });
   await expect(button).toBeVisible();

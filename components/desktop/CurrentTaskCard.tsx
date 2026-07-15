@@ -10,6 +10,7 @@ export interface CurrentTaskCardProps {
   revealedHintLevel?: number;
   hintAvailable?: boolean;
   onRequestHint?: () => void;
+  memoryNotice?: string;
   className?: string;
 }
 
@@ -19,6 +20,7 @@ export function CurrentTaskCard({
   revealedHintLevel = -1,
   hintAvailable = false,
   onRequestHint,
+  memoryNotice,
   className = "",
 }: CurrentTaskCardProps) {
   const titleId = useId();
@@ -47,6 +49,7 @@ export function CurrentTaskCard({
         <strong id={titleId}>{task.title}</strong>
         <span id={descriptionId}>{task.description}</span>
         {task.progressLabel && <small aria-label={`任务进度：${task.progressLabel}`}>{task.progressLabel}</small>}
+        {memoryNotice && <em className="current-task-memory">{memoryNotice}</em>}
         <span className="current-task-action"><LocateFixed size={15} aria-hidden="true" /> 定位线索</span>
       </button>
 

@@ -4,7 +4,36 @@
 
 **[立即进入雾港调查室](https://fog-harbor-archive.luomo.moe)**
 
-![雾港档案：失踪的第七码头](public/og-fog-harbor.png)
+![雾港档案：失踪的第七码头](public/og-fog-harbor.webp)
+
+## 2.2 档案记得你
+
+- 九个关键节点采用统一短演出：环境变化、短字幕、声音/视觉脉冲与可选档案定位均在 1.5–4 秒内完成，可立即跳过，并为 reduced motion 提供静态版本
+- 归档印章与镜像地图改为环境式线索，不再显示触发计数或剧透入口；键盘、触控与辅助调查模式仍可完整发现
+- 第二轮开始会出现更暗的调查室、远处轮廓、任务记忆与固定种子的低频环境异常；单轮最多两次，不改变证据、谜题或结局
+- 调查笔记新增按轮次分组的系统记录与安全纯文本导出；导出不会读取身份、网络、浏览器或设备元数据
+- Truth、Trade、Seventh 三个既有结局增加不同余波和可展开调查回顾，没有新增第四结局，也没有改变案件核心真相
+- 正式截图、每周 Dependabot、分级 audit CI、WebP 社交封面与主背景预加载完成；公开目录不再包含 PNG
+
+### 正式截图
+
+桌面端调查室（1440×900）：
+
+![桌面端雨夜调查室、当前任务与已打开档案](docs/screenshots/desktop-investigation.webp)
+
+移动端调查流程（390×844）：
+
+![移动端当前任务、调查应用网格与带名称 Dock](docs/screenshots/mobile-investigation.webp)
+
+二周目调查员索引：
+
+![使用虚构代号 ARCHIVE-07 的调查员索引](docs/screenshots/investigator-index.webp)
+
+截图可使用固定本地档案状态重新生成，不依赖联网服务，也不会写入真实时间：
+
+```bash
+npm run capture:docs
+```
 
 ## 2.1 调查体验
 
@@ -17,14 +46,6 @@
 - 新增桌面端与 `390×844` 触控端 Playwright 全流程回归，覆盖主线、二周目与彩蛋隔离性
 - 新增 Node.js 22 + Chromium 的 GitHub Actions 持续集成与失败产物留档
 - 生产公开目录只保留 WebP 运行时图片，原始 PNG 归档到 `design-assets/source/`，并排除出 Docker 构建上下文
-
-### 2.1 截图占位
-
-> 待补：桌面端主调查流程（1440×900）。
-
-> 待补：移动端触控调查流程（390×844）。
-
-> 待补：二周目调查员索引界面（不展示彩蛋触发方式）。
 
 ## 2.0 调查体验
 
@@ -66,9 +87,14 @@ npm run test:all
 npm run lint
 npx tsc --noEmit
 npm run build
+npm run capture:docs
+npm audit --omit=dev
+npm audit
 ```
 
 `npm run test:unit` 执行 Node.js 回归测试；`npm run test:e2e` 启动本地开发服务器并运行 Chromium 端到端测试。`npm test` 会先执行生产构建，再运行单元测试；`npm run test:all` 依次执行代码规范、类型检查、生产构建、单元测试和端到端测试。Playwright 的报告、失败截图、录像与追踪文件保存在 `output/playwright/`。
+
+两条完整 audit 命令当前会按设计报告 2 个已记录的 moderate 公告并返回退出码 1；影响面、缓解措施与 CI 阈值见 [`docs/security/dependency-audit.md`](docs/security/dependency-audit.md)。
 
 ## 技术栈
 
@@ -78,7 +104,7 @@ npm run build
 - Vinext 构建，以及 Next.js standalone + Docker Compose 生产运行
 - Cloudflare Tunnel 私有源站接入
 
-存档保存在浏览器 `localStorage` 的 `fog-harbor-save-v1` 键中；“重新开始”会保留已发现结局并进入下一轮调查。
+存档保存在浏览器 `localStorage` 的 `fog-harbor-save-v1` 键中，会话彩蛋状态继续使用 `fog-harbor-easter-session-v1`。“重新开始”会保留已发现结局、调查日志和叙事记忆并进入下一轮；旧版存档会在本地完成字段清洗与迁移。
 
 ## 私有服务器部署
 
@@ -98,9 +124,13 @@ curl --fail http://127.0.0.1:8797/
 - `.github/workflows/`：Node.js 22、Chromium 与完整测试流水线
 - `app/`：页面入口、全局样式与错误状态
 - `components/`：启动流程、调查桌面、窗口、谜题和声音组件
+- `components/cinematic/`：统一短演出字幕、视觉脉冲与事件呈现层
+- `docs/screenshots/`：README 使用的固定尺寸 WebP 正式截图
+- `docs/security/`：依赖公告、影响范围与缓解策略
 - `design-assets/source/`：原始 PNG 设计源文件与校验清单，不进入 Docker 运行镜像
+- `design-assets/marketing/`：社交封面设计源文件，不进入公开运行目录
 - `e2e/`：桌面端、移动端、二周目与彩蛋隔离性端到端测试
-- `lib/`：案件资料、证据、谜题与结局规则
+- `lib/`：案件资料、证据、谜题、演出、环境事件、日志与结局规则
 - `store/`：调查进度、存档校验与窗口状态
 - `tests/`：生产构建、关键规则与资源边界回归测试
 - `public/`：运行时 WebP、图标与社交分享封面

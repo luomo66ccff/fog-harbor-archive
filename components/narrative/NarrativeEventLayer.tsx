@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { AmbientMessage } from "@/components/narrative/AmbientMessage";
+import { getNextCinematicEvent } from "@/lib/cinematic-engine";
 import { getNextNarrativeEvent } from "@/lib/narrative-engine";
 import { useCaseStore } from "@/store/case-store";
 import type { WindowNavigationTarget } from "@/types/case";
@@ -20,6 +21,7 @@ export function NarrativeEventLayer({ onNavigate }: NarrativeEventLayerProps) {
   const currentEnding = useCaseStore((state) => state.currentEnding);
   const unlockQueue = useCaseStore((state) => state.unlockQueue);
   const seenNarrativeEvents = useCaseStore((state) => state.seenNarrativeEvents);
+  const seenCinematicEvents = useCaseStore((state) => state.seenCinematicEvents);
   const markNarrativeEventSeen = useCaseStore((state) => state.markNarrativeEventSeen);
   const context = useMemo(() => ({
     completedPuzzles,
@@ -31,13 +33,19 @@ export function NarrativeEventLayer({ onNavigate }: NarrativeEventLayerProps) {
     currentEnding,
   }), [completedPuzzles, currentEnding, discoveredAnonymous, provisionalTheory, readDocumentIds, readEvidenceIds, theoryHistory]);
 
-  const activeEvent = unlockQueue.length === 0
+  const cinematicPending = getNextCinematicEvent({
+    completedPuzzles,
+    theoryHistory,
+    seenNarrativeEvents,
+    currentEnding,
+  }, seenCinematicEvents);
+  const activeEvent = unlockQueue.length === 0 && !cinematicPending
     ? getNextNarrativeEvent(context, seenNarrativeEvents)
     : null;
   if (!activeEvent) return null;
 
   return (
-    <div className="narrative-event-layer" aria-live="polite">
+    <div className="narrative-event-layer">
       <AmbientMessage
         event={activeEvent}
         onDismiss={() => markNarrativeEventSeen(activeEvent.id)}

@@ -1,10 +1,11 @@
 "use client";
 
-import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, CassetteTape, Check, Contrast, Eraser, FileAudio, Pause, Play, RotateCcw, Save, ScanLine, SunMedium, Volume2, VolumeX } from "lucide-react";
+import { type CSSProperties, type KeyboardEvent, useEffect, useId, useMemo, useRef, useState } from "react";
+import { AlertTriangle, CassetteTape, Check, Contrast, Eraser, FileAudio, FileClock, NotebookPen, Pause, Play, RotateCcw, Save, ScanLine, SunMedium, Volume2, VolumeX } from "lucide-react";
 import { FrequencyPuzzle } from "@/components/puzzles/FrequencyPuzzle";
 import { PhotoPuzzle } from "@/components/puzzles/PhotoPuzzle";
 import { WindowFrame } from "@/components/windows/WindowFrame";
+import { InvestigationLog } from "@/components/windows/InvestigationLog";
 import { audioRecords } from "@/lib/case-data";
 import { isGhostChannelTuned } from "@/lib/easter-egg-engine";
 import { visualAssets } from "@/lib/visual-assets";
@@ -101,9 +102,27 @@ export function SurveillanceWindow() {
 export function NotesWindow() {
   const note = useCaseStore((state) => state.caseNote);
   const setNote = useCaseStore((state) => state.setCaseNote);
+  const [tab, setTab] = useState<"notes" | "system">("notes");
+  const tabsId = useId();
+  const selectTab = (next: "notes" | "system", focus = false) => {
+    setTab(next);
+    if (focus) window.requestAnimationFrame(() => document.getElementById(`${tabsId}-${next}-tab`)?.focus());
+  };
+  const handleTabKey = (event: KeyboardEvent<HTMLButtonElement>) => {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    const next = event.key === "ArrowLeft" || event.key === "Home" ? "notes" : "system";
+    selectTab(next, true);
+  };
   return (
     <WindowFrame id="notes" title="调查笔记" index="NOTE" className="small-window">
-      <div className="notebook-page"><header><span>调查员私人记录</span><strong><Save size={14} /> 自动存档</strong></header><label htmlFor="case-note">自由记录人物、时间与疑点</label><textarea id="case-note" value={note} onChange={(event) => setNote(event.target.value)} placeholder="例如：官方时间似乎都比物理记录快……" /><footer><span>{note.length} 字符</span><em>内容仅保存在此设备</em></footer></div>
+      <div className="window-tabs investigation-note-tabs" role="tablist" aria-label="调查记录册">
+        <button id={`${tabsId}-notes-tab`} type="button" role="tab" aria-selected={tab === "notes"} aria-controls={`${tabsId}-notes-panel`} tabIndex={tab === "notes" ? 0 : -1} className={tab === "notes" ? "is-active" : ""} onClick={() => selectTab("notes")} onKeyDown={handleTabKey}><NotebookPen size={14} /> 调查笔记</button>
+        <button id={`${tabsId}-system-tab`} type="button" role="tab" aria-selected={tab === "system"} aria-controls={`${tabsId}-system-panel`} tabIndex={tab === "system" ? 0 : -1} className={tab === "system" ? "is-active" : ""} onClick={() => selectTab("system")} onKeyDown={handleTabKey}><FileClock size={14} /> 系统记录</button>
+      </div>
+      {tab === "notes"
+        ? <div id={`${tabsId}-notes-panel`} role="tabpanel" aria-labelledby={`${tabsId}-notes-tab`} className="notebook-page"><header><span>调查员私人记录</span><strong><Save size={14} /> 自动存档</strong></header><label htmlFor="case-note">自由记录人物、时间与疑点</label><textarea id="case-note" value={note} onChange={(event) => setNote(event.target.value)} placeholder="例如：官方时间似乎都比物理记录快……" /><footer><span>{note.length} 字符</span><em>内容仅保存在本机浏览器</em></footer></div>
+        : <div id={`${tabsId}-system-panel`} role="tabpanel" aria-labelledby={`${tabsId}-system-tab`}><InvestigationLog /></div>}
     </WindowFrame>
   );
 }

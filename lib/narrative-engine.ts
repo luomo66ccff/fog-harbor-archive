@@ -15,13 +15,19 @@ const narrativeEventIds = [
   "gu-weian-payment-context",
   "chen-mu-protective-lie",
   "external-reader-detected",
-  "investigator-file-created",
+  "investigator-index-written",
 ] as const satisfies readonly NarrativeEventId[];
 
 const narrativeEventIdSet = new Set<string>(narrativeEventIds);
+export const LEGACY_INVESTIGATOR_EVENT_ID = "investigator-file-created";
 
 export function isNarrativeEventId(value: unknown): value is NarrativeEventId {
   return typeof value === "string" && narrativeEventIdSet.has(value);
+}
+
+export function normalizeNarrativeEventId(value: unknown): NarrativeEventId | null {
+  if (value === LEGACY_INVESTIGATOR_EVENT_ID) return "investigator-index-written";
+  return isNarrativeEventId(value) ? value : null;
 }
 
 export const narrativeEvents: readonly NarrativeEvent[] = [
@@ -169,29 +175,6 @@ export const narrativeEvents: readonly NarrativeEvent[] = [
     source: "archive",
     oneShot: true,
     target: { windowId: "people", focusId: "chen-mu" },
-  },
-  {
-    id: "external-reader-detected",
-    trigger: { kind: "puzzle-complete", puzzleId: "deduction" },
-    title: "检测到外部读取者",
-    body: [
-      "本终端并未完全离线。每次打开关键档案，都有一个未登记节点同步读取相同页码。",
-      "潮汐_0 不是唯一看见调查过程的人；第七层也可能不是一间文件夹。",
-    ],
-    source: "system",
-    oneShot: true,
-    target: { windowId: "finale" },
-  },
-  {
-    id: "investigator-file-created",
-    trigger: { kind: "ending-chosen", endingId: "seventh" },
-    title: "调查员档案已创建",
-    body: [
-      "索引对象已从 P-07-0712 扩展至本次会话调查员。",
-      "档案仅记录本地代号、进入时间、操作摘要与选择结果；未读取真实身份、网络地址或设备信息。",
-    ],
-    source: "system",
-    oneShot: true,
   },
 ] as const;
 

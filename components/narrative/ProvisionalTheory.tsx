@@ -23,6 +23,7 @@ export function ProvisionalTheory({ correction = false, compact = false, onSubmi
   const history = useCaseStore((state) => state.theoryHistory);
   const setTheory = useCaseStore((state) => state.setSecondFigureTheory);
   const hasCorrection = history.some((entry) => entry.includes("->"));
+  const latestCorrection = [...history].reverse().find((entry) => entry.includes("->"));
 
   const choose = (value: SecondFigureTheory) => {
     setTheory(value);
@@ -32,10 +33,11 @@ export function ProvisionalTheory({ correction = false, compact = false, onSubmi
   if (correction && !theory) return null;
 
   if (correction && hasCorrection) {
+    const [before = "unknown", after = "unknown"] = latestCorrection?.split("->") ?? [];
     return (
       <section className={`provisional-theory is-corrected ${compact ? "is-compact" : ""}`}>
         <RefreshCcw size={18} aria-hidden="true" />
-        <div><strong>推理已被新证据修正</strong><p>你没有删掉旧判断。系统保留了它，因为推翻自己的结论也是调查的一部分。</p></div>
+        <div><strong>推理已被新证据修正</strong><p className="theory-revision-mark"><del>{theoryCopy[before as SecondFigureTheory]?.label ?? before}</del><ins>{theoryCopy[after as SecondFigureTheory]?.label ?? after}</ins></p><p>系统注记：新证据改变了此前推论。旧判断仍被保留，因为推翻自己的结论也是调查的一部分。</p></div>
       </section>
     );
   }

@@ -88,7 +88,7 @@ export function DeductionPuzzle() {
     cue("error");
   };
 
-  if (solved) return <div className="deduction-resolution"><section className="puzzle-success"><Check size={20} aria-hidden="true" /><div><strong>责任链已闭合</strong><p>五段逻辑均已由独立记录交叉支持。系统不再把所有撒谎者压成同一种责任。</p></div></section><CaseReflection /></div>;
+  if (solved) return <div className="deduction-resolution"><section className="puzzle-success"><Check size={20} aria-hidden="true" /><div><strong>责任链已闭合</strong><p>五段逻辑均已由独立记录交叉支持。系统不再把所有撒谎者压成同一种责任。</p></div></section><div className="deduction-resolution-chain" aria-label="五段责任链：人物、时间、地点、行为、目的">{deductionSlots.map((slot, index) => <span key={slot} style={{ "--chain-index": index } as React.CSSProperties}>{slotLabels[slot]}</span>)}</div><CaseReflection /></div>;
 
   return (
     <section className="puzzle-panel deduction-puzzle" aria-labelledby="deduction-title">

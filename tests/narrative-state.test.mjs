@@ -45,7 +45,7 @@ function narrativeContext(overrides = {}) {
   };
 }
 
-test("declares ten one-shot narrative events and returns only unseen triggered events", async () => {
+test("declares eight playable narrative events and keeps finale-only records state-driven", async () => {
   const {
     getNextNarrativeEvent,
     getPendingNarrativeEvents,
@@ -53,10 +53,11 @@ test("declares ten one-shot narrative events and returns only unseen triggered e
     narrativeEvents,
   } = await loadModule("/lib/narrative-engine.ts");
 
-  assert.equal(narrativeEvents.length, 10);
-  assert.equal(new Set(narrativeEvents.map((event) => event.id)).size, 10);
+  assert.equal(narrativeEvents.length, 8);
+  assert.equal(new Set(narrativeEvents.map((event) => event.id)).size, 8);
   assert.ok(narrativeEvents.every((event) => event.oneShot));
   assert.equal(isNarrativeEventId("theory-correction"), true);
+  assert.equal(isNarrativeEventId("investigator-index-written"), true);
   assert.equal(isNarrativeEventId("invented-event"), false);
 
   const firstContext = narrativeContext({
@@ -112,13 +113,18 @@ test("declares ten one-shot narrative events and returns only unseen triggered e
   )?.id, "gu-weian-payment-context");
 
   assert.equal(getNextNarrativeEvent(
-    narrativeContext({ currentEnding: "seventh" }),
+    narrativeContext({ completedPuzzles: ["deduction"] }),
     [],
-  )?.id, "investigator-file-created");
+  ), null, "the external reader beat must wait for the final dossier to mount");
+  assert.equal(getNextNarrativeEvent(
+    narrativeContext({ completedPuzzles: ["deduction"], readDocumentIds: ["doc-final"] }),
+    [],
+  ), null, "FinaleWindow is the only trigger source for the external-reader record");
+
   assert.equal(getNextNarrativeEvent(
     narrativeContext({ currentEnding: "seventh" }),
-    ["investigator-file-created"],
-  ), null);
+    [],
+  ), null, "EndingScreen is the only visual source for investigator indexing");
 });
 
 test("easter egg helpers use forgiving ranges, preserve order, and record discoveries idempotently", async () => {
@@ -237,6 +243,8 @@ function persistedFallback() {
     bootSeen: false,
     runCount: 1,
     completedRuns: 0,
+    runHistory: [],
+    runEndedAt: null,
     completedPuzzles: [],
     unlockedEvidenceIds: ["ev-commission"],
     readDocumentIds: [],
@@ -350,8 +358,18 @@ test("store records theory revisions, preserves collections across runs, and ind
 
   state.chooseEnding("seventh");
   state = useCaseStore.getState();
-  assert.ok(state.seenNarrativeEvents.includes("investigator-file-created"));
-  assert.ok(state.discoveredEasterEggs.includes("investigator-index"));
+  assert.equal(state.seenNarrativeEvents.includes("investigator-index-written"), false);
+  assert.equal(state.discoveredEasterEggs.includes("investigator-index"), false);
+  state.markNarrativeEventSeen("investigator-index-written");
+  state.markNarrativeEventSeen("investigator-index-written");
+  state.discoverEasterEgg("investigator-index");
+  state.discoverEasterEgg("investigator-index");
+  state = useCaseStore.getState();
+  assert.equal(state.seenNarrativeEvents.filter((id) => id === "investigator-index-written").length, 1);
+  assert.equal(state.discoveredEasterEggs.filter((id) => id === "investigator-index").length, 1);
+  assert.equal(state.runHistory.length, 1);
+  assert.equal(state.runHistory[0].narrativeEventIds.filter((id) => id === "investigator-index-written").length, 1);
+  assert.equal(state.runHistory[0].discoveredEasterEggIds.filter((id) => id === "investigator-index").length, 1);
 
   state.clearAllProgress();
   state = useCaseStore.getState();
