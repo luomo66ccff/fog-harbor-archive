@@ -7,6 +7,8 @@ import { useCaseStore } from "@/store/case-store";
 interface AudioContextValue {
   initializeAudio: () => Promise<void>;
   cue: (name: SoundCue) => void;
+  duckAmbient: (durationMs?: number) => void;
+  cueHarborPattern: () => void;
   initialized: boolean;
 }
 
@@ -30,8 +32,10 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     }
   }, [setSoundDegraded]);
   const cue = useCallback((name: SoundCue) => engine.current?.cue(name), []);
+  const duckAmbient = useCallback((durationMs?: number) => engine.current?.duckAmbient(durationMs), []);
+  const cueHarborPattern = useCallback(() => engine.current?.cueHarborPattern(), []);
   useEffect(() => { engine.current?.applySettings(audio); }, [audio]);
-  const value = useMemo(() => ({ initializeAudio, cue, initialized }), [cue, initializeAudio, initialized]);
+  const value = useMemo(() => ({ initializeAudio, cue, cueHarborPattern, duckAmbient, initialized }), [cue, cueHarborPattern, duckAmbient, initializeAudio, initialized]);
   return <FogAudioContext.Provider value={value}>{children}</FogAudioContext.Provider>;
 }
 
@@ -40,4 +44,3 @@ export function useFogAudio() {
   if (!value) throw new Error("useFogAudio must be used inside AudioProvider");
   return value;
 }
-

@@ -4,6 +4,7 @@ import { readFile, readdir, stat } from "node:fs/promises";
 import test from "node:test";
 
 const runtimeDirectory = new URL("../public/assets/fog-harbor/", import.meta.url);
+const publicDirectory = new URL("../public/", import.meta.url);
 const sourceDirectory = new URL("../design-assets/source/", import.meta.url);
 
 async function sha256(file) {
@@ -19,6 +20,7 @@ test("keeps production assets WebP-only and preserves verified PNG sources", asy
   );
   const runtimeFiles = await readdir(runtimeDirectory);
   const sourceFiles = await readdir(sourceDirectory);
+  const publicFiles = await readdir(publicDirectory, { recursive: true });
   const runtimeWebp = runtimeFiles.filter((name) => name.endsWith(".webp"));
   const runtimePng = runtimeFiles.filter((name) => name.endsWith(".png"));
   const sourcePng = sourceFiles.filter((name) => name.endsWith(".png"));
@@ -30,6 +32,8 @@ test("keeps production assets WebP-only and preserves verified PNG sources", asy
   assert.equal(runtimeWebp.length, 10);
   assert.equal(runtimePng.length, 0, "source PNG files must never ship from public/");
   assert.equal(sourcePng.length, 10);
+  assert.equal(publicFiles.filter((name) => name.toLowerCase().endsWith(".png")).length, 0);
+  assert.ok(publicFiles.some((name) => name.replaceAll("\\", "/") === "og-fog-harbor.webp"));
 
   const runtimeIds = runtimeManifest.map((asset) => asset.id).sort();
   const sourceIds = sourceManifest.assets.map((asset) => asset.id).sort();

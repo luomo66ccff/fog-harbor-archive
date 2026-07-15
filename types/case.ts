@@ -134,6 +134,15 @@ export interface CaseEnding {
 }
 
 export type {
+  AmbientContext,
+  AmbientEvent,
+  AmbientEventId,
+  CinematicContext,
+  CinematicEnvironmentChange,
+  CinematicEvent,
+  CinematicEventId,
+  CinematicPulse,
+  CinematicTrigger,
   EasterEggId,
   NarrativeContext,
   NarrativeEvent,
@@ -141,5 +150,8 @@ export type {
   NarrativeState,
   NarrativeTrigger,
   ProvisionalTheoryState,
+  ReducedMotionAmbientDescriptor,
+  ReducedMotionCinematicDescriptor,
+  RunMemory,
   SecondFigureTheory,
 } from "./narrative";

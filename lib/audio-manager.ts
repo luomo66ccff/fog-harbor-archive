@@ -60,6 +60,8 @@ export class FogAudioEngine {
     if (!this.context || !this.master || !this.ambientGain || !this.interfaceGain) return;
     const at = this.context.currentTime;
     this.master.gain.setTargetAtTime(settings.muted ? 0 : settings.volume, at, 0.04);
+    this.ambientGain.gain.cancelScheduledValues(at);
+    this.ambientGain.gain.setValueAtTime(this.ambientGain.gain.value, at);
     this.ambientGain.gain.setTargetAtTime(settings.ambient ? 0.17 : 0, at, 0.15);
     this.interfaceGain.gain.setTargetAtTime(settings.interface ? 0.32 : 0, at, 0.04);
   }
@@ -82,6 +84,35 @@ export class FogAudioEngine {
     oscillator.stop(this.context.currentTime + duration);
   }
 
+  duckAmbient(durationMs = 1_200) {
+    if (!this.context || !this.ambientGain || this.settings.muted || !this.settings.ambient) return;
+    const at = this.context.currentTime;
+    const restoreAt = at + Math.max(250, durationMs) / 1_000;
+    this.ambientGain.gain.cancelScheduledValues(at);
+    this.ambientGain.gain.setTargetAtTime(0.035, at, 0.06);
+    this.ambientGain.gain.setTargetAtTime(0.17, restoreAt, 0.18);
+  }
+
+  cueHarborPattern() {
+    if (!this.context || !this.ambientGain || this.settings.muted || !this.settings.ambient) return;
+    const start = this.context.currentTime;
+    const beats: readonly [offset: number, duration: number][] = [
+      [0, 0.12], [0.24, 0.12], [0.48, 0.12], [0.9, 0.58],
+    ];
+    beats.forEach(([offset, duration]) => {
+      const oscillator = this.context!.createOscillator();
+      const gain = this.context!.createGain();
+      const at = start + offset;
+      oscillator.type = "sine";
+      oscillator.frequency.value = 82;
+      gain.gain.setValueAtTime(0.18, at);
+      gain.gain.exponentialRampToValueAtTime(0.0001, at + duration);
+      oscillator.connect(gain).connect(this.ambientGain!);
+      oscillator.start(at);
+      oscillator.stop(at + duration);
+    });
+  }
+
   async destroy() {
     this.noise?.stop();
     this.drone?.stop();
@@ -89,4 +120,3 @@ export class FogAudioEngine {
     this.context = null;
   }
 }
-

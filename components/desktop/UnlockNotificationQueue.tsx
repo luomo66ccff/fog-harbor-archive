@@ -1,19 +1,31 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { ArrowUpRight, Clock3 } from "lucide-react";
+import { getNextCinematicEvent } from "@/lib/cinematic-engine";
 import { getUnlockNotification } from "@/lib/progression-engine";
 import { useCaseStore } from "@/store/case-store";
 import { useWindowStore } from "@/store/window-store";
 
 export function UnlockNotificationQueue() {
   const queue = useCaseStore((state) => state.unlockQueue);
+  const completedPuzzles = useCaseStore((state) => state.completedPuzzles);
+  const theoryHistory = useCaseStore((state) => state.theoryHistory);
+  const seenNarrativeEvents = useCaseStore((state) => state.seenNarrativeEvents);
+  const currentEnding = useCaseStore((state) => state.currentEnding);
+  const seenCinematicEvents = useCaseStore((state) => state.seenCinematicEvents);
   const dismiss = useCaseStore((state) => state.dismissUnlockNotification);
   const openWindow = useWindowStore((state) => state.openWindow);
   const openButtonRef = useRef<HTMLButtonElement>(null);
   const focusNextRef = useRef(false);
   const current = queue[0];
   const notification = current ? getUnlockNotification(current) : null;
+  const cinematicPending = useMemo(() => Boolean(getNextCinematicEvent({
+    completedPuzzles,
+    theoryHistory,
+    seenNarrativeEvents,
+    currentEnding,
+  }, seenCinematicEvents)), [completedPuzzles, currentEnding, seenCinematicEvents, seenNarrativeEvents, theoryHistory]);
 
   useEffect(() => {
     if (!current || !focusNextRef.current) return;
@@ -43,7 +55,7 @@ export function UnlockNotificationQueue() {
       aria-live="polite"
       aria-atomic="true"
     >
-      {current && notification && (
+      {!cinematicPending && current && notification && (
         <aside className="unlock-notification" data-unlock-event={current}>
           <span className="unlock-notification-kicker">NEW ARCHIVE LINK</span>
           <strong>{notification.title}</strong>

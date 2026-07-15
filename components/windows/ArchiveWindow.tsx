@@ -11,6 +11,15 @@ import { useCaseStore } from "@/store/case-store";
 import { useWindowStore } from "@/store/window-store";
 
 type MaterialStyle = CSSProperties & Record<"--document-texture" | "--document-position" | "--folder-texture", string>;
+export type ArchiveStampStage = "idle" | "inked" | "marked" | "almost" | "revealed";
+
+export function getArchiveStampStage(clicks: number, revealed = false): ArchiveStampStage {
+  if (revealed || clicks >= 7) return "revealed";
+  if (clicks >= 6) return "almost";
+  if (clicks >= 5) return "marked";
+  if (clicks >= 3) return "inked";
+  return "idle";
+}
 
 export function ArchiveWindow() {
   const completed = useCaseStore((state) => state.completedPuzzles);
@@ -82,6 +91,7 @@ export function ArchiveWindow() {
   const stampRevealed = discoveredEasterEggs.includes("seven-stamp");
   const acrosticRevealed = discoveredEasterEggs.includes("archive-acrostic");
   const acrosticIndex = archiveAcrosticSequence.indexOf(selected.id as (typeof archiveAcrosticSequence)[number]);
+  const stampStage = getArchiveStampStage(stampClicks, stampRevealed);
 
   return (
     <WindowFrame id="archive" title="案件档案" index="A-01" className="wide-window">
@@ -97,10 +107,26 @@ export function ArchiveWindow() {
               return <button type="button" key={doc.id} disabled={!available} onClick={() => openDocument(doc.id)} className={`${selected.id === doc.id ? "is-selected" : ""} ${readIds.includes(doc.id) ? "is-read" : ""}`}><span>{doc.code}</span><strong>{doc.title}</strong><small>{available ? doc.category : "索引未恢复"}</small>{!available && <LockKeyhole size={13} />}</button>;
             })}
           </aside>
-          <article className={`document-sheet material-document material-${visual.material}`} style={materialStyle}>
+          <article className={`document-sheet material-document material-${visual.material} ${selected.id === "doc-case" ? `stamp-stage-${stampStage}` : ""}`} style={materialStyle}>
             <div className="document-material" aria-hidden="true" />
             <div className="paper-clip" aria-hidden="true" />
-            {selected.id === "doc-case" && <button type="button" className={`archive-seven-stamp ${stampRevealed ? "is-revealed" : ""}`} data-easter-egg="seven-stamp" onClick={() => { const next = pressArchiveStamp(); if (next >= 7) discoverEasterEgg("seven-stamp"); }} aria-label={`红色归档印章，已按下 ${Math.min(stampClicks, 7)} 次`}><Stamp size={18} aria-hidden="true" /><span>{stampRevealed ? "7 / 7" : `${stampClicks} / 7`}</span></button>}
+            {selected.id === "doc-case" && (
+              <button
+                type="button"
+                className={`archive-seven-stamp is-${stampStage}`}
+                data-easter-egg="seven-stamp"
+                data-stage={stampStage}
+                onClick={() => {
+                  if (stampRevealed) return;
+                  const next = pressArchiveStamp();
+                  if (next >= 7) discoverEasterEgg("seven-stamp");
+                }}
+                aria-label="可按压的归档印章"
+              >
+                <Stamp size={18} aria-hidden="true" />
+                <span aria-hidden="true">MGPA</span>
+              </button>
+            )}
             <header><span>{selected.category}</span><em>{selected.date}</em></header><p className="document-code">{selected.code}</p><h2>{selected.title}</h2><p className="document-byline">记录人：{selected.author.replace("{{code}}", code)}</p><blockquote>{selected.excerpt}</blockquote>
             <div className="document-body">{selected.body.map((paragraph) => <p key={paragraph}>{paragraph.replaceAll("{{code}}", code)}</p>)}</div>
             {stampRevealed && selected.id === "doc-case" && <aside className="seven-stamp-copy">{getSevenStampCopy(runCount)}</aside>}

@@ -1,18 +1,21 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import {
   Archive, CassetteTape, Cctv, Clock3, FileKey2, LockKeyhole, Mail, Map, Network, NotebookPen,
   Settings, UsersRound, Volume2, VolumeX,
 } from "lucide-react";
 import { useFogAudio } from "@/components/audio/AudioProvider";
+import { CinematicEventLayer } from "@/components/cinematic/CinematicEventLayer";
 import { CurrentTaskCard } from "@/components/desktop/CurrentTaskCard";
 import { HarborAtmosphere } from "@/components/desktop/HarborAtmosphere";
 import { LockedModuleDialog } from "@/components/desktop/LockedModuleDialog";
 import { UnlockNotificationQueue } from "@/components/desktop/UnlockNotificationQueue";
 import { EnvironmentalSecrets } from "@/components/narrative/EnvironmentalSecrets";
+import { AmbientEventLayer } from "@/components/narrative/AmbientEventLayer";
 import { NarrativeEventLayer } from "@/components/narrative/NarrativeEventLayer";
+import { useIdleActivity } from "@/components/hooks/useIdleActivity";
 import { ArchiveWindow } from "@/components/windows/ArchiveWindow";
 import { EvidenceWindow } from "@/components/windows/EvidenceWindow";
 import { FinaleWindow } from "@/components/windows/FinaleWindow";
@@ -29,6 +32,19 @@ import {
 import { useCaseStore } from "@/store/case-store";
 import { useWindowStore } from "@/store/window-store";
 import type { InvestigationTask, InvestigationTaskId, PuzzleId, WindowId, WindowNavigationTarget } from "@/types/case";
+import type { CinematicEvent, CinematicEventId } from "@/types/narrative";
+
+const cinematicCue: Record<CinematicEventId, "terminal" | "paper" | "tape" | "unlock" | "error"> = {
+  "time-restored": "paper",
+  "tape-signal-locked": "tape",
+  "photo-restored": "tape",
+  "theory-corrected": "paper",
+  "chain-closed": "unlock",
+  "external-reader": "terminal",
+  "ending-truth": "unlock",
+  "ending-trade": "error",
+  "ending-seventh": "terminal",
+};
 
 const modules: { id: WindowId; label: string; code: string; icon: typeof Archive; deskClass: string; completion?: PuzzleId }[] = [
   { id: "archive", label: "案件档案", code: "A-01", icon: Archive, deskClass: "object-archive", completion: "schedule" },
@@ -69,11 +85,10 @@ export function InvestigationDesktop({ onLeave }: { onLeave: () => void }) {
   const restoreWindow = useWindowStore((state) => state.restoreWindow);
   const closeWindow = useWindowStore((state) => state.closeWindow);
   const started = useRef(false);
-  const idleTimerRef = useRef<number | null>(null);
   const [lockedAccess, setLockedAccess] = useState<LockedModuleAccess | null>(null);
   const [hintLevels, setHintLevels] = useState<Partial<Record<InvestigationTaskId, number>>>({});
   const [idleReadyTaskKey, setIdleReadyTaskKey] = useState<string | null>(null);
-  const { cue } = useFogAudio();
+  const { cue, duckAmbient } = useFogAudio();
 
   const progress = calculateProgress(completed, evidenceIds.length, anonymous);
   const credibility = credibilityLabel(completed, evidenceIds.length);
@@ -110,26 +125,13 @@ export function InvestigationDesktop({ onLeave }: { onLeave: () => void }) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [closeWindow, lockedAccess]);
 
-  useEffect(() => {
-    const taskKey = `${runCount}:${currentTask.id}`;
-    const armTimer = () => {
-      if (idleTimerRef.current !== null) window.clearTimeout(idleTimerRef.current);
-      idleTimerRef.current = window.setTimeout(() => setIdleReadyTaskKey(taskKey), 90000);
-    };
-    const onActivity = () => {
-      if (!document.hidden) {
-        armTimer();
-      }
-    };
-    armTimer();
-    window.addEventListener("pointerdown", onActivity, { passive: true });
-    window.addEventListener("keydown", onActivity);
-    return () => {
-      if (idleTimerRef.current !== null) window.clearTimeout(idleTimerRef.current);
-      window.removeEventListener("pointerdown", onActivity);
-      window.removeEventListener("keydown", onActivity);
-    };
-  }, [currentTask.id, runCount]);
+  const revealIdleHint = useCallback(() => setIdleReadyTaskKey(currentTaskKey), [currentTaskKey]);
+  useIdleActivity({ timeoutMs: 90_000, onIdle: revealIdleHint });
+
+  const handleCinematicStart = useCallback((event: CinematicEvent) => {
+    cue(cinematicCue[event.id]);
+    if (event.id === "tape-signal-locked") duckAmbient(1_300);
+  }, [cue, duckAmbient]);
 
   const navigate = (target: WindowNavigationTarget) => {
     const { windowId, tab, focusId } = target;
@@ -154,8 +156,8 @@ export function InvestigationDesktop({ onLeave }: { onLeave: () => void }) {
   };
 
   return (
-    <main className="investigation-desktop" data-story-time={clock}>
-      <HarborAtmosphere dimmed={windowsVisible} />
+    <main className="investigation-desktop" data-story-time={clock} data-run-number={runCount}>
+      <HarborAtmosphere dimmed={windowsVisible} runCount={runCount} />
       <EnvironmentalSecrets frequencySolved={completed.includes("frequency")} runCount={runCount} />
       <div className="desk-grain" aria-hidden="true" />
       <header className="case-statusbar">
@@ -172,6 +174,7 @@ export function InvestigationDesktop({ onLeave }: { onLeave: () => void }) {
           ...levels,
           [currentTask.id]: Math.min((levels[currentTask.id] ?? -1) + 1, currentTask.hintLevels.length - 1),
         }))}
+        memoryNotice={runCount >= 2 ? "系统记得你曾经完成过这一阶段。" : undefined}
         className="desk-brief"
       />
 
@@ -210,7 +213,9 @@ export function InvestigationDesktop({ onLeave }: { onLeave: () => void }) {
       </nav>
 
       <UnlockNotificationQueue />
+      <CinematicEventLayer onNavigate={navigate} onEventStart={handleCinematicStart} />
       <NarrativeEventLayer onNavigate={navigate} />
+      <AmbientEventLayer />
       <LockedModuleDialog access={lockedAccess} onClose={() => setLockedAccess(null)} onNavigate={navigate} />
     </main>
   );
