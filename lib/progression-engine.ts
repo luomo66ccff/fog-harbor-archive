@@ -12,7 +12,6 @@ import type {
 export const moduleUnlocks: Partial<Record<WindowId, PuzzleId>> = {
   audio: "schedule",
   surveillance: "frequency",
-  evidence: "photo",
   finale: "deduction",
 };
 
@@ -97,15 +96,15 @@ const taskDefinitions: readonly InvestigationTaskDefinition[] = [
   },
   {
     id: "close-chain",
-    title: "闭合五段责任链",
-    description: "闭合责任链，同时区分主导者、执行者、被胁迫者、保护者与失踪证人。",
+    title: "完成三项关键对质",
+    description: "用独立来源与反方材料，分别证明时间作伪、靠泊掩盖与梯道接应。",
     target: { windowId: "evidence", tab: "deduction" },
     puzzleId: "deduction",
-    progressTotal: 5,
-    progressUnit: "段关系",
+    progressTotal: 3,
+    progressUnit: "项对质",
     hintLevels: [
       "先从拥有系统主时钟权限的人开始核对。",
-      "每一段关系都应能找到已核验证据支持，而不是只靠人物证词。",
+      "先阅读证据原文，再选择命题、附上证据并回应反方材料。",
       "真正被掩盖的是一项靠泊活动；用它反推行为与目的。",
     ],
   },
@@ -117,7 +116,7 @@ const taskDefinitions: readonly InvestigationTaskDefinition[] = [
     progressTotal: 1,
     progressUnit: "项最终选择",
     hintLevels: [
-      "不同选择要求的关键证据数量不同，可以先回到证据墙复核。",
+      "三项主线对质决定公开范围；第七层需要另外证明系统延续性。",
       "匿名委托人的真实身份会影响隐藏档案是否能够继续打开。",
       "作出选择前，确认你已经阅读希望用于结论的关键证据。",
     ],
@@ -142,8 +141,8 @@ const moduleLockCopy: Partial<Record<WindowId, { title: string; missing: string;
   },
   finale: {
     title: "最终档案暂时不可访问",
-    missing: "完整的五段责任链",
-    reason: "人物、时间、地点、行为与目的尚未被同一组证据闭合。",
+    missing: "三项关键对质",
+    reason: "时间作伪、靠泊掩盖与梯道接应仍需独立证明。",
   },
 };
 
@@ -164,7 +163,7 @@ const unlockNotifications: Record<UnlockEventId, UnlockNotificationDefinition> =
   },
   photo: {
     eventId: "photo",
-    title: "证据墙已开放",
+    title: "照片证据已归档",
     content: "照片、岸钟倒影、检修梯线索与异常付款批次已进入关系图。",
     reason: "密封照片中的关键细节已经确认。",
     target: { windowId: "evidence", tab: "board" },
@@ -173,7 +172,7 @@ const unlockNotifications: Record<UnlockEventId, UnlockNotificationDefinition> =
     eventId: "deduction",
     title: "最终档案已开放",
     content: "重建卷宗、封存指令、医院缴费附件与声纹比对现在可以访问。",
-    reason: "五段责任链已经被现有证据闭合。",
+    reason: "三项关键对质已成立，反方材料已被解释。",
     target: { windowId: "finale" },
   },
   anonymous: {
@@ -186,9 +185,9 @@ const unlockNotifications: Record<UnlockEventId, UnlockNotificationDefinition> =
   hidden: {
     eventId: "hidden",
     title: "第七层索引已恢复",
-    content: "隐藏档案的结局条件已经满足。",
+    content: "销毁器指纹已恢复，返回证据墙完成第四项对质。",
     reason: "地图背面的镜像索引已经成功解密。",
-    target: { windowId: "finale" },
+    target: { windowId: "evidence", tab: "deduction" },
   },
 };
 

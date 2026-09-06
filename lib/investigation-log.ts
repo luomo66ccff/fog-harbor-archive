@@ -13,7 +13,7 @@ const puzzleLabels: Record<PuzzleId, string> = {
 
 const endingLabels: Record<EndingId, string> = {
   truth: "公开全部档案",
-  trade: "接受匿名交易",
+  trade: "保护证人，有限公开",
   seventh: "进入隐藏档案",
 };
 

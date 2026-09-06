@@ -4,27 +4,6 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { createServer } from "vite";
 
-async function render() {
-  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
-  workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
-  const { default: worker } = await import(workerUrl.href);
-  return worker.fetch(
-    new Request("http://localhost/", { headers: { accept: "text/html" } }),
-    { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
-    { waitUntil() {}, passThroughOnException() {} },
-  );
-}
-
-test("server-renders the finished fog harbor archive shell", async () => {
-  const response = await render();
-  assert.equal(response.status, 200);
-  assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
-  const html = await response.text();
-  assert.match(html, /雾港档案/);
-  assert.match(html, /失踪的第七码头|读取潮湿的纸张/);
-  assert.doesNotMatch(html, /Your site is taking shape|Codex is working|codex-preview/);
-});
-
 test("ships the complete playable investigation structure", async () => {
   const [page, layout, caseData, evidenceData, puzzleEngine, store, packageJson, css, responsiveCss, puzzleCss, visualCss, evidenceCss] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
@@ -62,7 +41,7 @@ test("ships the complete playable investigation structure", async () => {
   assert.match(fullCss, /harbor-atmosphere/);
   assert.match(fullCss, /linear-gradient\s*\(/i, "the upgraded scene uses restrained depth overlays");
 
-  for (const path of ["SchedulePuzzle.tsx", "FrequencyPuzzle.tsx", "PhotoPuzzle.tsx", "DeductionPuzzle.tsx", "HiddenPuzzle.tsx"]) {
+  for (const path of ["SchedulePuzzle.tsx", "FrequencyPuzzle.tsx", "PhotoPuzzle.tsx", "ClaimBoard.tsx", "HiddenPuzzle.tsx"]) {
     await access(new URL(`../components/puzzles/${path}`, import.meta.url));
   }
 });
@@ -123,7 +102,7 @@ test("sanitizes structurally corrupt persisted case fields before merging", asyn
     }, fallback);
 
     assert.deepEqual(sanitized.completedPuzzles, fallback.completedPuzzles);
-    assert.deepEqual(sanitized.unlockedEvidenceIds, fallback.unlockedEvidenceIds);
+    assert.deepEqual(sanitized.unlockedEvidenceIds, ["ev-commission", "ev-case-file", "ev-duty", "ev-port-log", "ev-weather", "ev-phone"]);
     assert.deepEqual(sanitized.readDocumentIds, fallback.readDocumentIds);
     assert.deepEqual(sanitized.endingsSeen, fallback.endingsSeen);
     assert.deepEqual(sanitized.evidenceVerdicts, { "ev-valid": "credible" });

@@ -179,7 +179,7 @@ test("truth and trade endings render their distinct aftermath", async ({ page })
   await page.evaluate((key) => {
     const state = JSON.parse(localStorage.getItem(key) ?? "{}").state ?? {};
     localStorage.setItem(key, JSON.stringify({ state: { ...state, currentEnding: "trade", endingsSeen: ["truth", "trade"] }, version: 1 }));
-  }, "fog-harbor-save-v1");
+  }, "fog-harbor-save-v3");
   await page.reload();
   await dismissCinematicEvents(page);
   await expect(page.getByText("档案删除：1")).toBeVisible();

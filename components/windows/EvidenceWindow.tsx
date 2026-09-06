@@ -6,7 +6,7 @@ import {
   Check, FileSearch, GitCompareArrows, Grid2X2, Link2, List, MessageSquareText, Pin, ShieldCheck,
 } from "lucide-react";
 import { ProvisionalTheory } from "@/components/narrative/ProvisionalTheory";
-import { DeductionPuzzle } from "@/components/puzzles/DeductionPuzzle";
+import { ClaimBoard } from "@/components/puzzles/ClaimBoard";
 import { WindowFrame } from "@/components/windows/WindowFrame";
 import { evidence } from "@/lib/evidence-data";
 import { evaluateEvidenceReview, getVerifiedEvidenceIds } from "@/lib/evidence-engine";
@@ -65,11 +65,12 @@ export function EvidenceWindow() {
   const selected = visibleEvidence.find((item) => item.id === selectedId) ?? visibleEvidence[0] ?? null;
   const verifiedIds = useMemo(() => getVerifiedEvidenceIds({
     visibleEvidenceIds: unlockedIds,
+    readEvidenceIds: readIds,
     legacyVerifiedEvidenceIds: legacyVerifiedIds,
     touchedEvidenceIds: touchedIds,
     verdicts,
     relations,
-  }), [legacyVerifiedIds, relations, touchedIds, unlockedIds, verdicts]);
+  }), [legacyVerifiedIds, readIds, relations, touchedIds, unlockedIds, verdicts]);
   const review = selected
     ? evaluateEvidenceReview(selected.id, verdicts[selected.id] ?? "unmarked", relations[selected.id])
     : null;
@@ -159,8 +160,8 @@ export function EvidenceWindow() {
 
   return (
     <WindowFrame id="evidence" title="证据墙" index={`E-${visibleEvidence.length.toString().padStart(2, "0")}`} className="max-window" variant="cork">
-      <div className="window-tabs"><button type="button" className={tab === "board" ? "is-active" : ""} onClick={() => setTab("board")}><Pin size={14} /> 证据墙</button><button type="button" className={tab === "deduction" ? "is-active" : ""} onClick={() => setTab("deduction")}><Link2 size={14} /> 关系推理 {completed.includes("deduction") && <Check size={13} />}</button><span className="review-counter"><ShieldCheck size={13} /> 关键证据已核验 {criticalEvidenceCount(verifiedIds)}/{criticalEvidenceCount(unlockedIds)}</span></div>
-      {tab === "deduction" ? <DeductionPuzzle /> : (
+      <div className="window-tabs"><button type="button" className={tab === "board" ? "is-active" : ""} onClick={() => setTab("board")}><Pin size={14} /> 证据墙</button><button type="button" className={tab === "deduction" ? "is-active" : ""} onClick={() => setTab("deduction")}><Link2 size={14} /> 关键对质 {completed.includes("deduction") && <Check size={13} />}</button><span className="review-counter"><ShieldCheck size={13} /> 单项复核 {criticalEvidenceCount(verifiedIds)}/{criticalEvidenceCount(unlockedIds)}</span></div>
+      {tab === "deduction" ? <ClaimBoard /> : (
         <div className="evidence-layout">
           <div className="evidence-view-toggle" role="group" aria-label="证据显示模式"><button type="button" className={boardMode === "graph" ? "is-active" : ""} onClick={() => setPreferredBoardMode("graph")}><Grid2X2 size={14} /> 图谱</button><button type="button" className={boardMode === "list" ? "is-active" : ""} onClick={() => setPreferredBoardMode("list")}><List size={14} /> 列表</button></div>
           <div className={`cork-board evidence-mode-${boardMode}`} ref={boardRef}>
@@ -172,7 +173,7 @@ export function EvidenceWindow() {
             })}
           </div>
           <aside className="evidence-inspector">
-            {selected ? <><header><span>{selected.index}</span><strong>{selected.title}</strong><small>{selected.type.toUpperCase()} / {selected.acquiredAt}</small></header><div className={`evidence-preview preview-${selected.type}`}><FileSearch size={26} /><span>{selected.source}</span></div><p>{selected.description}</p>{(selected.id === "ev-toolbox" || selected.id === "ev-voiceprint") && <ProvisionalTheory correction compact />}<dl><div><dt>时间</dt><dd>{selected.relatedTime}</dd></div><div><dt>人物</dt><dd>{selected.relatedPeople.length ? selected.relatedPeople.join(" / ") : "未确认"}</dd></div><div><dt>地点</dt><dd>{selected.relatedLocations.join(" / ")}</dd></div></dl><fieldset className="verdict-field"><legend>证据判断</legend>{(["credible", "doubtful", "forged"] as EvidenceVerdict[]).map((verdict) => <button type="button" key={verdict} className={(verdicts[selected.id] ?? "unmarked") === verdict ? "is-active" : ""} onClick={() => setVerdict(selected.id, verdict)}>{verdictLabels[verdict]}</button>)}</fieldset><div className={`evidence-review-status ${review?.verified || verifiedIds.includes(selected.id) ? "is-verified" : ""}`} role="status"><ShieldCheck size={15} /><span><strong>{review?.verified || verifiedIds.includes(selected.id) ? "已核验" : "交叉验证中"}</strong>{review?.message}</span></div><label className="evidence-note"><span><MessageSquareText size={14} /> 调查批注</span><textarea value={notes[selected.id] ?? ""} onChange={(event) => setNote(selected.id, event.target.value)} placeholder="记录这条证据与其他线索的关系……" /></label><div className="related-list"><span><GitCompareArrows size={13} /> 选择支持或矛盾证据</span>{selected.relatedEvidence.filter((id) => unlockedIds.includes(id)).map((id) => { const item = evidence.find((entry) => entry.id === id); return item ? <div className="related-review-row" key={id}><button type="button" className="related-evidence-link" onClick={() => selectEvidence(id)}>{item.index} {item.title}</button><div>{relationButton(id, "supports", "支持")}{relationButton(id, "contradicts", "矛盾")}</div></div> : null; })}</div></> : <div className="empty-inspector">选择一张证据卡查看详情与真实关系线。</div>}
+            {selected ? <><header><span>{selected.index}</span><strong>{selected.title}</strong><small>{selected.type.toUpperCase()} / {selected.acquiredAt}</small></header><div className={`evidence-preview preview-${selected.type}`}><FileSearch size={26} /><span>{selected.source}</span></div><p>{selected.description}</p>{(selected.id === "ev-toolbox" || selected.id === "ev-voiceprint") && <ProvisionalTheory correction compact />}<dl><div><dt>时间</dt><dd>{selected.relatedTime}</dd></div><div><dt>人物</dt><dd>{selected.relatedPeople.length ? selected.relatedPeople.join(" / ") : "未确认"}</dd></div><div><dt>地点</dt><dd>{selected.relatedLocations.join(" / ")}</dd></div></dl><fieldset className="verdict-field"><legend>证据判断</legend>{(["credible", "doubtful", "forged"] as EvidenceVerdict[]).map((verdict) => <button type="button" key={verdict} className={(verdicts[selected.id] ?? "unmarked") === verdict ? "is-active" : ""} onClick={() => setVerdict(selected.id, verdict)}>{verdictLabels[verdict]}</button>)}</fieldset><div className={`evidence-review-status ${verifiedIds.includes(selected.id) ? "is-verified" : ""}`} role="status"><ShieldCheck size={15} /><span><strong>{verifiedIds.includes(selected.id) ? "已核验" : "交叉验证中"}</strong>{review?.verified && !verifiedIds.includes(selected.id) ? "请先打开关联证据原文，再完成交叉复核。" : review?.message}</span></div><label className="evidence-note"><span><MessageSquareText size={14} /> 调查批注</span><textarea value={notes[selected.id] ?? ""} onChange={(event) => setNote(selected.id, event.target.value)} placeholder="记录这条证据与其他线索的关系……" /></label><div className="related-list"><span><GitCompareArrows size={13} /> 选择支持或矛盾证据</span>{selected.relatedEvidence.filter((id) => unlockedIds.includes(id)).map((id) => { const item = evidence.find((entry) => entry.id === id); return item ? <div className="related-review-row" key={id}><button type="button" className="related-evidence-link" onClick={() => selectEvidence(id)}>{item.index} {item.title}</button><div>{relationButton(id, "supports", "支持")}{relationButton(id, "contradicts", "矛盾")}</div></div> : null; })}</div></> : <div className="empty-inspector">选择一张证据卡查看详情与真实关系线。</div>}
           </aside>
         </div>
       )}

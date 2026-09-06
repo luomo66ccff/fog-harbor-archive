@@ -1,48 +1,43 @@
 {
   "name": "fog-harbor-archive",
-  "version": "2.2.0",
+  "version": "3.0.0",
   "private": true,
+  "packageManager": "npm@11.6.1",
   "engines": {
-    "node": ">=22.13.0"
+    "node": ">=24.0.0",
+    "npm": ">=11.6.1"
   },
   "scripts": {
-    "dev": "cross-env WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext dev",
-    "build": "cross-env WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext build",
-    "start": "cross-env WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "node scripts/start-production.mjs",
+    "verify:production": "node scripts/verify-production.mjs",
     "test:unit": "node --test",
     "test:e2e": "playwright test",
-    "capture:docs": "node scripts/capture-readme-screenshots.mjs",
-    "test": "npm run build && npm run test:unit",
-    "test:all": "npm run lint && npx tsc --noEmit && npm run build && npm run test:unit && npm run test:e2e",
+    "capture:docs": "node scripts/capture-upgrade-screenshots.mjs",
+    "test": "npm run build && npm run verify:production && npm run test:unit",
+    "test:all": "npm run lint && npx tsc --noEmit && npm run build && npm run verify:production && npm run test:unit && npm run test:e2e",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next --ignore-pattern output"
   },
   "dependencies": {
-    "framer-motion": "^12.42.2",
-    "lucide-react": "^1.24.0",
-    "next": "16.2.10",
-    "react": "19.2.6",
-    "react-dom": "19.2.6",
-    "zustand": "^5.0.14"
+    "framer-motion": "^12.43.0",
+    "lucide-react": "^1.41.0",
+    "next": "16.3.4",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "zustand": "^5.0.15"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "1.44.0",
-    "@cloudflare/workers-types": "5.20260708.1",
-    "@playwright/test": "^1.61.1",
-    "@tailwindcss/postcss": "4.2.1",
-    "@types/node": "22.19.19",
-    "@types/react": "19.2.14",
-    "@types/react-dom": "19.2.3",
-    "@vitejs/plugin-react": "6.0.2",
-    "@vitejs/plugin-rsc": "0.5.26",
-    "cross-env": "^10.1.0",
-    "eslint": "9.39.4",
-    "eslint-config-next": "16.2.10",
-    "react-server-dom-webpack": "19.2.6",
-    "tailwindcss": "4.2.1",
+    "@playwright/test": "^1.63.0",
+    "@tailwindcss/postcss": "4.3.3",
+    "@types/node": "24.13.3",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.7",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.3.4",
+    "tailwindcss": "4.3.3",
     "typescript": "5.9.3",
-    "vinext": "0.0.50",
-    "vite": "8.1.4",
-    "wrangler": "4.110.0"
+    "vite": "8.2.2"
   },
   "type": "module"
 }

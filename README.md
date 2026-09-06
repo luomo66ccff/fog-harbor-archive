@@ -1,136 +1,99 @@
 # 雾港档案：失踪的第七码头
 
-一款可在浏览器中完整游玩的沉浸式悬疑解谜游戏。玩家将进入一间被封存的港口调查室，通过档案、录音、监控照片、证据关系与时间线重建失踪案真相，并根据调查深度抵达不同结局。
+一款可在浏览器中完整游玩的悬疑解谜游戏。进入封存的港口调查室，校准时间、修复录音、拼合照片，再用独立证据与反方材料重建失踪案。
 
-**[立即进入雾港调查室](https://fog-harbor-archive.luomo.moe)**
+[线上入口](https://fog-harbor-archive.luomo.moe) · [3.0 检查与升级记录](docs/releases/upgrade-t001.md) · [依赖审计](docs/security/dependency-audit-t001.md)
 
-![雾港档案：失踪的第七码头](public/og-fog-harbor.webp)
+![雾港档案](public/og-fog-harbor.webp)
 
-## 2.2 档案记得你
+## 3.0 / 每个结论都需要证据
 
-- 九个关键节点采用统一短演出：环境变化、短字幕、声音/视觉脉冲与可选档案定位均在 1.5–4 秒内完成，可立即跳过，并为 reduced motion 提供静态版本
-- 归档印章与镜像地图改为环境式线索，不再显示触发计数或剧透入口；键盘、触控与辅助调查模式仍可完整发现
-- 第二轮开始会出现更暗的调查室、远处轮廓、任务记忆与固定种子的低频环境异常；单轮最多两次，不改变证据、谜题或结局
-- 调查笔记新增按轮次分组的系统记录与安全纯文本导出；导出不会读取身份、网络、浏览器或设备元数据
-- Truth、Trade、Seventh 三个既有结局增加不同余波和可展开调查回顾，没有新增第四结局，也没有改变案件核心真相
-- 正式截图、每周 Dependabot、分级 audit CI、WebP 社交封面与主背景预加载完成；公开目录不再包含 PNG
+- **四项关键对质**：时间作伪、靠泊掩盖、梯道接应、外部节点。提交命题、阅读并附入证据、回应反方材料。三项主线成立后进入最终卷宗；隐藏路线需要另外证明系统延续性。
+- **能追溯的剧情**：新增管理员审计、检修电台缓存、桶身残码与销毁器指纹。派生图像不算独立来源，照片无法证明的动作不再写成事实。
+- **不同的公开范围**：全部公开、保护证人的有限公开、暂缓公开并继续跨港追踪。卷宗区分已确认事实、责任与未知；选择前说明消息源暴露和追责延迟的代价。
+- **安全带走进度**：自动存档、对质草稿、JSON 备份与预览恢复。存储被禁用、空间不足或读取失败时仍可调查，并提示导出。损坏记录先保留副本。
+- **旧档继续游玩**：读取 v1 并写入新的 v3 存档，原始 v1 保留。旧版已经完成的推理与隐藏关卡保留成果，不要求重玩。
+- **一套生产运行链**：Next.js 16.3.4、React 19.2.8、Node.js 24；开发、构建、验证和 Docker 使用 Next。已移除 Vinext / Worker / Sites 临时托管层。
 
-### 正式截图
+原有调查室、三个操作谜题、人物档案、时间线、笔记、程序化环境音、二周目与可选彩蛋继续保留。键盘、390×844 触控、辅助调查模式及减少动态效果均有回归覆盖。
 
-桌面端调查室（1440×900）：
+## 界面
 
-![桌面端雨夜调查室、当前任务与已打开档案](docs/screenshots/desktop-investigation.webp)
+对质卷宗（桌面端）：
 
-移动端调查流程（390×844）：
+![3.0 对质卷宗](docs/screenshots/confrontation-desktop-t003.webp)
 
-![移动端当前任务、调查应用网格与带名称 Dock](docs/screenshots/mobile-investigation.webp)
+手机端对质与证据原文：
 
-二周目调查员索引：
+![手机端对质](docs/screenshots/confrontation-mobile-t003.webp)
 
-![使用虚构代号 ARCHIVE-07 的调查员索引](docs/screenshots/investigator-index.webp)
-
-截图可使用固定本地档案状态重新生成，不依赖联网服务，也不会写入真实时间：
-
-```bash
-npm run capture:docs
-```
-
-## 2.1 调查体验
-
-- 在原有五阶段框架中重排“官方结论 → 误导嫌疑 → 新证据纠正 → 责任分层 → 外部读取反转”，保留三个既有结局与案件核心真相
-- 新增照片第二道人影的临时推理：第一次判断不会锁死主线，读取工具箱或声纹后可以修正，并在本地留下推理历史
-- 许晚澄、顾惟安、陈牧与唐芷获得更完整的动机和责任层次；最终档案会区分事实、法律、道德责任与保护性谎言
-- 新增不剧透的可选彩蛋、二周目铅笔批注与调查员索引，让重复调查获得额外叙事层次
-- 默认采用无剧透说明：彩蛋完全可选，不参与主线谜题、档案完整度或结局门槛；本文档不会公开触发方式
-- 普通逐区扫描只高亮可疑范围，辅助调查模式才会自动确认；责任链允许自由试放，并在提交后分项报告错误
-- 新增桌面端与 `390×844` 触控端 Playwright 全流程回归，覆盖主线、二周目与彩蛋隔离性
-- 新增 Node.js 22 + Chromium 的 GitHub Actions 持续集成与失败产物留档
-- 生产公开目录只保留 WebP 运行时图片，原始 PNG 归档到 `design-assets/source/`，并排除出 Docker 构建上下文
-
-## 2.0 调查体验
-
-- 潮湿工业港口调查室：分层雨雾、玻璃水痕、远港灯光、真实纸张与设备材质
-- 五阶段当前任务：直接定位目标窗口与标签，展示子进度、渐进提示和锁定原因
-- 三套操作型核心谜题：双时间轴校准、录音信号锁定、3×2 照片复原与放大调查
-- 可验证的证据墙：可信度判断、支持/矛盾关系与附带证据的五段责任链
-- 动态案件时间：调查推进会将终端时间从 02:17 推至 03:07，并触发环境与通讯变化
-- 完整移动端玩法：调查应用网格、带名称 Dock、全屏窗口、触控拼图、地图缩放和证据列表
-- 兼容旧存档：继续使用 `fog-harbor-save-v1`，并为旧版已读关键证据提供迁移基础
-
-## 游戏内容
-
-- 11 个可操作调查模块，包含 23 条证据、11 份文档、9 段通讯与 3 份录音转写
-- 4 个真实谜题：时间偏移、频率解码、碎片复原、证据链推演
-- 7 名案件相关人物、11 个时间线节点、3 个正式结局与 1 条隐藏线索
-- 本地存档、结局收藏、二周目文本、程序化环境音与完整静音控制
-- 桌面和移动端布局、键盘操作、焦点管理、减少动态效果与高对比度适配
+先启动本地生产服务器，再运行 `npm run capture:docs` 可生成下一组递增版本截图；旧截图不会被覆盖。
 
 ## 本地运行
 
-需要 Node.js `>=22.13.0`。
+需要 Node.js 24 和 npm >=11.6.1。
 
-```bash
-npm install
+```sh
+npm ci
 npm run dev
 ```
 
-开发服务器启动后，打开终端输出的本地地址即可进入游戏。
+生产构建与运行：
 
-## 验证命令
-
-```bash
-npx playwright install chromium
-npm run test:unit
-npm run test:e2e
-npm test
-npm run test:all
-npm run lint
-npx tsc --noEmit
+```sh
 npm run build
-npm run capture:docs
-npm audit --omit=dev
+npm run start -- --hostname 127.0.0.1 --port 3000
+```
+
+`start` 复制公开资源与静态文件到 standalone 目录，然后启动实际生产产物；不会隐式构建。也支持 `PORT`、`HOSTNAME` 环境变量。
+
+## 验证
+
+```sh
+npx playwright install chromium
+npm run test:all
+```
+
+完整检查包含代码规范、类型检查、Next 生产构建、生产 HTTP 与资源探测、单元测试和浏览器测试。Playwright 默认构建并启动生产服务器；指定 `PLAYWRIGHT_BASE_URL` 时测试该已有服务。Windows 可设置 `PLAYWRIGHT_BROWSER_CHANNEL=msedge` 使用已安装的 Edge。
+
+```sh
+npm run test:unit
+npm run verify:production
+npm run test:e2e
 npm audit
 ```
 
-`npm run test:unit` 执行 Node.js 回归测试；`npm run test:e2e` 启动本地开发服务器并运行 Chromium 端到端测试。`npm test` 会先执行生产构建，再运行单元测试；`npm run test:all` 依次执行代码规范、类型检查、生产构建、单元测试和端到端测试。Playwright 的报告、失败截图、录像与追踪文件保存在 `output/playwright/`。
+测试日志与失败截图、录像、追踪文件保存在 `output/`，不提交到仓库。2026-09-06 的完整依赖审计为 **0 vulnerabilities**；这是一份日期明确的检查结果，后续公告由 CI 和 Dependabot 持续检查。
 
-两条完整 audit 命令当前会按设计报告 2 个已记录的 moderate 公告并返回退出码 1；影响面、缓解措施与 CI 阈值见 [`docs/security/dependency-audit.md`](docs/security/dependency-audit.md)。
+## 存档与恢复
 
-## 技术栈
+当前调查保存到 `fog-harbor-save-v3`，会话彩蛋仍使用 `fog-harbor-easter-session-v1`。开场和系统设置均有“备份与恢复”入口。恢复前先展示代号、轮次与完成情况，确认后替换当前调查。
 
-- Next.js App Router、React、TypeScript
-- Tailwind CSS、Framer Motion、Lucide React
-- Zustand 持久化状态管理
-- Vinext 构建，以及 Next.js standalone + Docker Compose 生产运行
-- Cloudflare Tunnel 私有源站接入
+“重新开始本案”会清空本轮谜题、证据判断与对质，保留既有结局、轮次日志和叙事记忆。旧 `fog-harbor-save-v1` 不会被迁移过程覆盖。损坏内容的保留副本可从备份面板导出；它不是可直接导入的标准游戏备份。
 
-存档保存在浏览器 `localStorage` 的 `fog-harbor-save-v1` 键中，会话彩蛋状态继续使用 `fog-harbor-easter-session-v1`。“重新开始”会保留已发现结局、调查日志和叙事记忆并进入下一轮；旧版存档会在本地完成字段清洗与迁移。
+备份包含调查员代号、笔记和剧情进度，仅由浏览器下载或读取，不上传到服务器。浏览器无法持久保存时，请导出后再关闭页面。
 
 ## 私有服务器部署
 
-服务器版本使用 `Dockerfile.server` 和 `compose.server.yaml`。应用容器只映射到主机 `127.0.0.1:8797`，`cloudflared` 容器通过同一 Compose 网络访问应用，公网不需要开放应用端口。
+`Dockerfile.server` 构建 Next standalone 产物，以非 root 用户运行。`compose.server.yaml` 将应用绑定到主机 `127.0.0.1:8797`，Tunnel 通过 Compose 网络访问应用。
 
-当前生产入口为 `https://fog-harbor-archive.luomo.moe`。
+在未提交的 `.env.server` 中配置 `TUNNEL_TOKEN` 后：
 
-部署机需要 Docker 与 Docker Compose，并在未提交的 `.env.server` 中提供远程管理 Tunnel 的 `TUNNEL_TOKEN`：
-
-```bash
+```sh
 docker compose -f compose.server.yaml --env-file .env.server up -d --build
 curl --fail http://127.0.0.1:8797/
 ```
 
-## 主要目录
+部署前保留当前镜像标签与 Compose 配置，发布后验证入口、静态资源和存档迁移；需要回滚时恢复旧镜像。旧版本仍能读取保留的 v1 原档，3.0 新进度应先导出。线上部署版本以实际发布为准。
 
-- `.github/workflows/`：Node.js 22、Chromium 与完整测试流水线
-- `app/`：页面入口、全局样式与错误状态
-- `components/`：启动流程、调查桌面、窗口、谜题和声音组件
-- `components/cinematic/`：统一短演出字幕、视觉脉冲与事件呈现层
-- `docs/screenshots/`：README 使用的固定尺寸 WebP 正式截图
-- `docs/security/`：依赖公告、影响范围与缓解策略
-- `design-assets/source/`：原始 PNG 设计源文件与校验清单，不进入 Docker 运行镜像
-- `design-assets/marketing/`：社交封面设计源文件，不进入公开运行目录
-- `e2e/`：桌面端、移动端、二周目与彩蛋隔离性端到端测试
-- `lib/`：案件资料、证据、谜题、演出、环境事件、日志与结局规则
-- `store/`：调查进度、存档校验与窗口状态
-- `tests/`：生产构建、关键规则与资源边界回归测试
-- `public/`：运行时 WebP、图标与社交分享封面
+## 目录
+
+- `components/`：调查室、谜题、对质、卷宗和备份交互
+- `lib/`：案件内容、对质规则、结局条件、存档适配与日志导出
+- `store/`：持久化进度与窗口状态
+- `tests/`、`e2e/`：规则与浏览器回归
+- `scripts/`：生产启动、HTTP 验证与版本化截图
+- `docs/`：正式截图、升级记录和历史审计
+- `design-assets/source/`：只读源素材，不进入 Docker 镜像
+
+历史版本说明见 [CHANGELOG](CHANGELOG.md)。

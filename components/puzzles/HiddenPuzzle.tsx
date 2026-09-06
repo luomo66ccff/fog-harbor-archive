@@ -30,7 +30,7 @@ export function HiddenPuzzle() {
     }
   };
 
-  if (solved) return <section className="puzzle-success hidden-success"><Check size={20} /><div><strong>隐藏索引已打开</strong><p>雾港只是栖潮计划的七处节点之一，“档案第七码头”结局条件已满足。</p></div></section>;
+  if (solved) return <section className="puzzle-success hidden-success"><Check size={20} /><div><strong>隐藏索引已打开</strong><p>镜像图与销毁器指纹已归档。返回关键对质，核查 ARCHIVE-02 是否沿用旧封存流程。</p></div></section>;
 
   return (
     <section className="hidden-puzzle" aria-labelledby="hidden-title"><p className="eyebrow">UNLISTED / MAP REVERSE</p><h3 id="hidden-title">地图背面的镜像字迹</h3><p>只有识破委托人后，这张贴在地图背面的湿纸条才会显影。</p>

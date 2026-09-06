@@ -37,8 +37,15 @@ import {
 } from "@/lib/ambient-event-engine";
 import { useWindowStore } from "@/store/window-store";
 import type { InvestigationRunSnapshot } from "@/lib/investigation-log";
+import { caseStorage } from "@/lib/save-storage";
+import { decodeSaveFile, encodeSaveFile } from "@/lib/save-file";
+import { claimDefinitions, mainClaimIds } from "@/lib/claim-data";
+import { getProvenClaimIds, migrateLegacyClaims } from "@/lib/claim-engine";
+import { canChooseEnding } from "@/lib/ending-engine";
+import type { ClaimId, ClaimSubmission } from "@/types/investigation";
 
-export const SAVE_KEY = "fog-harbor-save-v1";
+// The original fog-harbor-save-v1 remains readable and untouched for rollback.
+export const SAVE_KEY = "fog-harbor-save-v3";
 
 export interface AudioSettings {
   muted: boolean;
@@ -48,6 +55,11 @@ export interface AudioSettings {
 }
 
 interface CaseState extends NarrativeState {
+  storyVersion: 3;
+  claimSubmissions: Partial<Record<ClaimId, ClaimSubmission>>;
+  claimDrafts: Partial<Record<ClaimId, ClaimSubmission>>;
+  saveClaimDraft: (id: ClaimId, draft: ClaimSubmission) => void;
+  submitClaim: (id: ClaimId, submission: ClaimSubmission) => void;
   hydrated: boolean;
   investigatorCode: string;
   bootSeen: boolean;
@@ -108,6 +120,9 @@ interface CaseState extends NarrativeState {
 export type PersistedCaseState = Pick<
   CaseState,
   | "investigatorCode"
+  | "storyVersion"
+  | "claimSubmissions"
+  | "claimDrafts"
   | "bootSeen"
   | "runCount"
   | "completedRuns"
@@ -442,6 +457,9 @@ function audioSettingsOr(value: unknown, fallback: AudioSettings): AudioSettings
 
 function persistedSnapshot(state: CaseState): PersistedCaseState {
   return {
+    storyVersion: 3,
+    claimSubmissions: state.claimSubmissions,
+    claimDrafts: state.claimDrafts,
     investigatorCode: state.investigatorCode,
     bootSeen: state.bootSeen,
     runCount: state.runCount,
@@ -491,6 +509,32 @@ export function sanitizePersistedCaseState(
     || Object.prototype.hasOwnProperty.call(source, "legacyVerifiedEvidenceIds")
     || Object.prototype.hasOwnProperty.call(source, "evidenceRelations");
   const completedPuzzles = puzzleArrayOr(source.completedPuzzles, fallback.completedPuzzles);
+  const claimSubmissions: Partial<Record<ClaimId, ClaimSubmission>> = source.storyVersion !== 3
+    ? migrateLegacyClaims(completedPuzzles)
+    : {};
+  if (source.storyVersion === 3 && isRecord(source.claimSubmissions)) {
+    for (const definition of claimDefinitions) {
+      const item = source.claimSubmissions[definition.id];
+      if (!isRecord(item) || typeof item.propositionId !== "string" || typeof item.rebuttalChoiceId !== "string") continue;
+      claimSubmissions[definition.id] = {
+        propositionId: item.propositionId.slice(0, 100),
+        rebuttalChoiceId: item.rebuttalChoiceId.slice(0, 100),
+        evidenceIds: stringArrayOr(item.evidenceIds).filter((id) => evidence.some((entry) => entry.id === id)),
+        migrated: item.migrated === true,
+      };
+    }
+  }
+  const claimDrafts: Partial<Record<ClaimId, ClaimSubmission>> = {};
+  if (isRecord(source.claimDrafts)) {
+    for (const definition of claimDefinitions) {
+      const item = source.claimDrafts[definition.id];
+      if (!isRecord(item) || typeof item.propositionId !== "string" || typeof item.rebuttalChoiceId !== "string") continue;
+      claimDrafts[definition.id] = {
+        propositionId: item.propositionId.slice(0, 100), rebuttalChoiceId: item.rebuttalChoiceId.slice(0, 100),
+        evidenceIds: stringArrayOr(item.evidenceIds).filter((id) => evidence.some((entry) => entry.id === id)),
+      };
+    }
+  }
   const currentEnding = source.currentEnding === null || isEndingId(source.currentEnding)
     ? source.currentEnding
     : fallback.currentEnding;
@@ -529,6 +573,9 @@ export function sanitizePersistedCaseState(
     ? easterEggArrayOr(source.runDiscoveredEasterEggIds, fallback.runDiscoveredEasterEggIds ?? [])
     : (runHistory.length === 0 ? [...discoveredEasterEggs] : []);
   return {
+    storyVersion: 3,
+    claimSubmissions,
+    claimDrafts,
     investigatorCode: typeof source.investigatorCode === "string"
       ? source.investigatorCode.trim().slice(0, 18)
       : fallback.investigatorCode,
@@ -540,7 +587,7 @@ export function sanitizePersistedCaseState(
     runHistory,
     runEndedAt: runEndedAtOr(source.runEndedAt, fallback.runEndedAt ?? null),
     completedPuzzles,
-    unlockedEvidenceIds: stringArrayOr(source.unlockedEvidenceIds, fallback.unlockedEvidenceIds),
+    unlockedEvidenceIds: unique([...initialEvidenceIds, ...stringArrayOr(source.unlockedEvidenceIds, fallback.unlockedEvidenceIds), ...completedPuzzles.flatMap((id) => puzzleRewards[id] ?? []), ...((source.discoveredAnonymous === true || (source.storyVersion !== 3 && completedPuzzles.includes("hidden"))) ? ["ev-voiceprint"] : [])]),
     readDocumentIds: stringArrayOr(source.readDocumentIds, fallback.readDocumentIds),
     readMessageIds: stringArrayOr(source.readMessageIds, fallback.readMessageIds),
     readEvidenceIds,
@@ -552,7 +599,7 @@ export function sanitizePersistedCaseState(
       ? stringArrayOr(source.legacyVerifiedEvidenceIds, fallback.legacyVerifiedEvidenceIds)
       : readEvidenceIds.filter((id) => criticalEvidenceIds.has(id)),
     caseNote: typeof source.caseNote === "string" ? source.caseNote : fallback.caseNote,
-    discoveredAnonymous: typeof source.discoveredAnonymous === "boolean" ? source.discoveredAnonymous : fallback.discoveredAnonymous,
+    discoveredAnonymous: source.storyVersion !== 3 && completedPuzzles.includes("hidden") ? true : typeof source.discoveredAnonymous === "boolean" ? source.discoveredAnonymous : fallback.discoveredAnonymous,
     currentEnding,
     endingsSeen,
     puzzleAttempts: puzzleAttemptsOr(source.puzzleAttempts, fallback.puzzleAttempts),
@@ -581,6 +628,9 @@ export function sanitizePersistedCaseState(
 }
 
 const freshProgress = {
+  storyVersion: 3 as const,
+  claimSubmissions: {} as Partial<Record<ClaimId, ClaimSubmission>>,
+  claimDrafts: {} as Partial<Record<ClaimId, ClaimSubmission>>,
   completedPuzzles: [] as PuzzleId[],
   unlockedEvidenceIds: [...initialEvidenceIds],
   readDocumentIds: [] as string[],
@@ -639,7 +689,19 @@ export const useCaseStore = create<CaseState>()(
       markBootSeen: () => set({ bootSeen: true }),
       markDocumentRead: (id) => set((state) => ({ readDocumentIds: unique([...state.readDocumentIds, id]) })),
       markMessageRead: (id) => set((state) => ({ readMessageIds: unique([...state.readMessageIds, id]) })),
-      markEvidenceRead: (id) => set((state) => ({ readEvidenceIds: unique([...state.readEvidenceIds, id]) })),
+      markEvidenceRead: (id) => set((state) => state.readEvidenceIds.includes(id) ? state : ({ readEvidenceIds: [...state.readEvidenceIds, id] })),
+      saveClaimDraft: (id, draft) => set((state) => ({ claimDrafts: { ...state.claimDrafts, [id]: { ...draft, migrated: false } } })),
+      submitClaim: (id, submission) => {
+        if (!claimDefinitions.some((item) => item.id === id)) return;
+        set((state) => ({ claimSubmissions: { ...state.claimSubmissions, [id]: { ...submission, migrated: false } } }));
+        const state = get();
+        const proven = getProvenClaimIds(state.claimSubmissions, state);
+        for (const claimId of mainClaimIds) {
+          if (proven.includes(claimId)) state.markTaskProgress("close-chain", claimId);
+        }
+        state.recordAttempt("deduction");
+        if (mainClaimIds.every((claimId) => proven.includes(claimId))) state.completePuzzle("deduction");
+      },
       setEvidenceVerdict: (id, verdict) => set((state) => ({
         evidenceVerdicts: { ...state.evidenceVerdicts, [id]: verdict },
         evidenceReviewTouchedIds: unique([...state.evidenceReviewTouchedIds, id]),
@@ -743,6 +805,7 @@ export const useCaseStore = create<CaseState>()(
       setAssistedInvestigation: (value) => set({ assistedInvestigation: value }),
       completePuzzle: (id) => {
         if (get().completedPuzzles.includes(id)) return;
+        if (id === "deduction" && !mainClaimIds.every((claim) => getProvenClaimIds(get().claimSubmissions, get()).includes(claim))) return;
         const rewards = puzzleRewards[id] ?? [];
         set((state) => ({
           completedPuzzles: [...state.completedPuzzles, id],
@@ -753,6 +816,7 @@ export const useCaseStore = create<CaseState>()(
       },
       identifyAnonymous: () => {
         if (get().discoveredAnonymous) return;
+        if (!get().completedPuzzles.includes("deduction")) return;
         set((state) => ({
           discoveredAnonymous: true,
           unlockedEvidenceIds: unique([...state.unlockedEvidenceIds, "ev-voiceprint"]),
@@ -762,6 +826,7 @@ export const useCaseStore = create<CaseState>()(
       },
       chooseEnding: (id) => set((state) => {
         if (state.currentEnding) return state;
+        if (!canChooseEnding(id, state)) return state;
         const endedAt = Date.now();
         const snapshot: InvestigationRunSnapshot = {
           runNumber: state.runCount,
@@ -853,8 +918,9 @@ export const useCaseStore = create<CaseState>()(
     }),
     {
       name: SAVE_KEY,
-      version: 1,
-      storage: createJSONStorage(() => localStorage),
+      version: 3,
+      storage: createJSONStorage(() => caseStorage.storage),
+      migrate: (persistedState) => persistedState as PersistedCaseState,
       skipHydration: true,
       partialize: persistedSnapshot,
       merge: (persistedState, currentState) => ({
@@ -868,13 +934,22 @@ export const useCaseStore = create<CaseState>()(
 export async function hydrateCaseStore() {
   try {
     await useCaseStore.persist.rehydrate();
-  } catch {
-    try {
-      localStorage.removeItem(SAVE_KEY);
-    } catch {
-      // Storage may be blocked. The in-memory investigation remains playable.
-    }
   } finally {
     useCaseStore.getState().setHydrated(true);
   }
+}
+
+export function exportCaseBackup(): string {
+  return encodeSaveFile(persistedSnapshot(useCaseStore.getState()));
+}
+
+export function previewCaseBackup(text: string): PersistedCaseState {
+  return sanitizePersistedCaseState(decodeSaveFile(text), persistedSnapshot(useCaseStore.getInitialState()));
+}
+
+export function restoreCaseBackup(text: string): void {
+  const state = previewCaseBackup(text);
+  useWindowStore.getState().closeAll();
+  useWindowStore.getState().resetEasterEggSession();
+  useCaseStore.setState({ ...state, hydrated: true, unlockQueue: [], lastUnlock: null });
 }
