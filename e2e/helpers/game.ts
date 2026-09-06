@@ -1,6 +1,6 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 
-export const SAVE_KEY = "fog-harbor-save-v1";
+export const SAVE_KEY = "fog-harbor-save-v3";
 
 const initialEvidenceIds = [
   "ev-commission",
@@ -232,69 +232,46 @@ export async function solvePhoto(page: Page, options: MainFlowOptions = {}) {
   await openCurrentUnlock(page, options);
 }
 
-async function reviewEvidence(
-  page: Page,
-  title: string,
-  verdict: string,
-  relatedTitle: string,
-  options: MainFlowOptions,
-) {
-  await activate(page, page.locator(".evidence-card").filter({ hasText: title }), options.touch);
-  await activate(page, page.locator(".evidence-inspector .verdict-field").getByRole("button", { name: verdict }), options.touch);
-  const relation = page.locator(".related-review-row").filter({ hasText: relatedTitle });
-  await activate(page, relation.getByRole("button", { name: "支持" }), options.touch);
-  await expect(page.locator(".evidence-inspector .evidence-review-status")).toContainText("已核验");
-}
+export const claimSolutions = {
+  "clock-fabrication": { proposition: "manual-clock-and-weather-template", sources: ["ev-weather", "ev-offset", "ev-clock-admin-trace", "ev-duty"] },
+  "heron-coverup": { proposition: "hazmat-and-coordinated-coverup", sources: ["ev-port-log", "ev-photo", "ev-drum-stencil", "ev-payment", "ev-clock-admin-trace", "ev-case-file"] },
+  "ladder-escape": { proposition: "planned-maintenance-escape", sources: ["ev-audio-0712", "ev-tape-edit", "ev-rescue-channel", "ev-toolbox", "ev-photo"] },
+  "archive02-continuity": { proposition: "active-purge-network-node", sources: ["ev-voiceprint", "ev-seven-map", "ev-erasure-fingerprint", "ev-closure-order", "ev-commission"] },
+};
 
-async function assignDeductionToken(page: Page, slot: string, token: string, options: MainFlowOptions) {
-  await activate(page, page.locator(".token-bank button").filter({ hasText: token }), options.touch);
-  await activate(page, page.locator(".chain-slot").filter({ hasText: slot }).locator(".chain-slot-target"), options.touch);
-}
-
-async function attachEvidence(page: Page, slot: string, evidence: string, options: MainFlowOptions) {
-  await activate(page, page.locator(".deduction-evidence fieldset").filter({ hasText: slot }).getByRole("button", { name: new RegExp(evidence) }), options.touch);
+export async function solveClaim(page: Page, id: keyof typeof claimSolutions, options: MainFlowOptions = {}) {
+  const solution = claimSolutions[id];
+  await activate(page, page.locator(`[data-claim-tab="${id}"]`), options.touch);
+  await activate(page, page.locator(`input[value="${solution.proposition}"]`), options.touch);
+  for (const source of solution.sources) {
+    const record = page.locator(`[data-source-id="${source}"]`);
+    if (!(await record.getAttribute("open"))) {
+      const isOpen = await record.evaluate((element) => (element as HTMLDetailsElement).open);
+      if (!isOpen) await activate(page, record.locator("summary"), options.touch);
+    }
+    const checkbox = record.getByRole("checkbox");
+    if (!(await checkbox.isChecked())) await activate(page, checkbox, options.touch);
+  }
+  await activate(page, page.locator(`input[name="rebuttal-${id}"][value="cross-check"]`), options.touch);
+  await activate(page, page.getByRole("button", { name: "提交本项对质" }), options.touch);
+  await expect(page.locator(".claim-established")).toContainText("此项对质已成立");
 }
 
 export async function solveDeductionAndChooseTradeEnding(page: Page, options: MainFlowOptions = {}) {
-  await reviewEvidence(page, "十一分钟校时差", "可信", "夜班签到与校时表", options);
-  await reviewEvidence(page, "监控岸钟倒影", "可信", "十一分钟校时差", options);
-  await reviewEvidence(page, "白鹭七号完整照片", "可信", "七号泊位进港记录", options);
-
   if (options.reviseTheory) {
     await activate(page, page.locator(".evidence-card").filter({ hasText: "陈牧的检修工具箱" }), options.touch);
-    const correction = page.locator(".evidence-inspector .provisional-theory.is-correction");
-    await activate(page, correction.getByRole("button", { name: /第二道人影是救援者/ }), options.touch);
+    await activate(page, page.locator(".evidence-inspector .provisional-theory.is-correction").getByRole("button", { name: /第二道人影是救援者/ }), options.touch);
     await dismissNarrativeEvents(page);
   }
-
-  if (options.touch) {
-    await page.locator(".window-evidence .window-content").evaluate((element) => element.scrollTo({ top: 0 }));
-  }
-  await activate(page, page.getByRole("button", { name: /关系推理/ }), options.touch);
-  if (options.assisted) {
-    await expect(page.locator(".token-bank").getByRole("button", { name: "周既明，分类：人物" })).toBeVisible();
-  }
-  await assignDeductionToken(page, "人物", "周既明", options);
-  await assignDeductionToken(page, "时间", "00:31", options);
-  await assignDeductionToken(page, "地点", "监控室", options);
-  await assignDeductionToken(page, "行为", "快调系统主时钟", options);
-  await assignDeductionToken(page, "目的", "掩盖白鹭七号靠泊", options);
-  await attachEvidence(page, "人物", "十一分钟校时差", options);
-  await attachEvidence(page, "时间", "十一分钟校时差", options);
-  await attachEvidence(page, "地点", "监控岸钟倒影", options);
-  await attachEvidence(page, "行为", "十一分钟校时差", options);
-  await attachEvidence(page, "目的", "白鹭七号完整照片", options);
-  await activate(page, page.getByRole("button", { name: "验证责任链与附件" }), options.touch);
-  await expect(page.getByText("责任链已闭合")).toBeVisible();
+  await activate(page, page.getByRole("button", { name: "关键对质", exact: true }), options.touch);
+  for (const id of ["clock-fabrication", "heron-coverup", "ladder-escape"] as const) await solveClaim(page, id, options);
   await openCurrentUnlock(page, options);
-
   await activate(page, page.locator(".candidate-list button").filter({ hasText: "林知夏" }), options.touch);
   await activate(page, page.getByRole("button", { name: /提交声纹比对/ }), options.touch);
   await expect(page.getByText("身份确认：林知夏")).toBeVisible();
-  await activate(page, page.locator(".ending-options button").filter({ hasText: "接受匿名交易" }), options.touch);
+  await activate(page, page.locator('[data-ending-id="trade"]'), options.touch);
   await expect(page.getByRole("heading", { name: "被删除的人" })).toBeVisible();
 }
-
 export async function completeMainFlow(page: Page, options: MainFlowOptions = {}) {
   await solveSchedule(page, options);
   await solveFrequency(page, options);

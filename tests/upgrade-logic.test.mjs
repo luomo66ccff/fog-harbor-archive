@@ -96,7 +96,6 @@ test("advances through five current tasks and sends locked modules to the real p
   const lockChecks = [
     { completed: [], moduleId: "audio", required: "schedule", nextTarget: stages[0].target },
     { completed: ["schedule"], moduleId: "surveillance", required: "frequency", nextTarget: stages[1].target },
-    { completed: ["schedule", "frequency"], moduleId: "evidence", required: "photo", nextTarget: stages[2].target },
     { completed: ["schedule", "frequency", "photo"], moduleId: "finale", required: "deduction", nextTarget: stages[3].target },
   ];
 
@@ -108,6 +107,7 @@ test("advances through five current tasks and sends locked modules to the real p
     assert.equal(getModuleAccess([...check.completed, check.required], check.moduleId).unlocked, true);
   }
 
+  assert.equal(getModuleAccess([], "evidence").unlocked, true, "evidence reading is available from the beginning");
   const finishedTasks = getInvestigationTasks({
     completedPuzzles: ["schedule", "frequency", "photo", "deduction"],
     currentEnding: "truth",
@@ -375,6 +375,7 @@ test("evidence review and five-link deduction report exact validation counts", a
 
   const verifiedIds = getVerifiedEvidenceIds({
     visibleEvidenceIds: ["ev-commission", "ev-offset", "ev-photo"],
+    readEvidenceIds: ["ev-commission", "ev-offset", "ev-photo"],
     legacyVerifiedEvidenceIds: ["ev-commission", "ev-photo"],
     touchedEvidenceIds: ["ev-photo"],
     verdicts: { "ev-offset": "credible", "ev-photo": "credible" },
@@ -383,7 +384,7 @@ test("evidence review and five-link deduction report exact validation counts", a
       "ev-photo": { supports: ["ev-port-log"], contradicts: [] },
     },
   });
-  assert.deepEqual(new Set(verifiedIds), new Set(["ev-commission", "ev-offset", "ev-photo"]));
+  assert.deepEqual(new Set(verifiedIds), new Set(["ev-commission"]));
 
   const supportedChain = {
     person: ["ev-offset"],

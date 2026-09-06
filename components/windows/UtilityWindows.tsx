@@ -6,6 +6,7 @@ import { FrequencyPuzzle } from "@/components/puzzles/FrequencyPuzzle";
 import { PhotoPuzzle } from "@/components/puzzles/PhotoPuzzle";
 import { WindowFrame } from "@/components/windows/WindowFrame";
 import { InvestigationLog } from "@/components/windows/InvestigationLog";
+import { SaveBackupPanel } from "@/components/game/SaveBackupPanel";
 import { audioRecords } from "@/lib/case-data";
 import { isGhostChannelTuned } from "@/lib/easter-egg-engine";
 import { visualAssets } from "@/lib/visual-assets";
@@ -158,7 +159,8 @@ export function SettingsWindow({ onLeave }: { onLeave: () => void }) {
         <label className="switch-row assisted-investigation-setting"><span><strong>辅助调查模式</strong><small>逐区扫描会自动确认照片异常，责任链从一开始显示 Token 分类；不改变剧情、证据或结局条件。</small></span><input type="checkbox" checked={assistedInvestigation} onChange={(event) => setAssistedInvestigation(event.target.checked)} /></label>
         <p className="easter-egg-counter">隐藏发现记录：{discoveredEasterEggs.length} / 8　·　所有隐藏互动均为可选，不参与主线或结局判定。</p>
         <div className="save-actions"><button type="button" onClick={restart}><RotateCcw size={15} /> 重新开始本案</button><button type="button" className="danger-action" onClick={clear}><Eraser size={15} /> 清除全部进度</button></div>
-        <p className="settings-footnote">调查进度在每次操作后自动写入 localStorage。声音关闭不影响任何谜题答案。</p>
+        <SaveBackupPanel onRestore={onLeave} />
+        <p className="settings-footnote">调查进度自动保存在当前浏览器。更换设备前可以导出备份。声音关闭不影响任何谜题答案。</p>
       </section>
     </WindowFrame>
   );

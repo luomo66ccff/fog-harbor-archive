@@ -16,7 +16,7 @@ interface MapHotspot extends LocationRecord {
 
 const mapHotspots: MapHotspot[] = [
   ...locations,
-  { id: "loc-passage", name: "外侧通道", kind: "封锁区域", x: 63, y: 69, description: "第七码头外侧的狭窄步道。照片显示 00:43 前后这里曾出现争执。", linkedEvidence: ["ev-photo", "ev-draft"], unlockAfter: "photo" },
+  { id: "loc-passage", name: "外侧通道", kind: "封锁区域", x: 63, y: 69, description: "第七码头外侧的狭窄步道。照片显示 00:43 前后这里出现两道人影；是否为接应，需要其他记录佐证。", linkedEvidence: ["ev-photo", "ev-draft"], unlockAfter: "photo" },
   { id: "loc-ladder", name: "检修梯", kind: "下层通道", x: 75, y: 78, description: "通往水线下方的维修梯。第二道人影与陈牧的工具箱都在附近被确认。", linkedEvidence: ["ev-toolbox", "ev-cctv"], unlockAfter: "photo" },
 ];
 

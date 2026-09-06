@@ -201,6 +201,8 @@ test("stores narrative and hidden discoveries as honest per-run deltas", async (
   });
   useCaseStore.getState().markNarrativeEventSeen("first-time-contradiction");
   useCaseStore.getState().discoverEasterEgg("seven-stamp");
+  const { migrateLegacyClaims } = await loadModule("/lib/claim-engine.ts");
+  useCaseStore.setState({ completedPuzzles: ["deduction"], discoveredAnonymous: true, claimSubmissions: migrateLegacyClaims(["deduction"]) });
   useCaseStore.getState().chooseEnding("truth");
   useCaseStore.getState().restartCase();
 
@@ -209,6 +211,7 @@ test("stores narrative and hidden discoveries as honest per-run deltas", async (
   assert.deepEqual(state.runDiscoveredEasterEggIds, []);
   useCaseStore.getState().markNarrativeEventSeen("theory-correction");
   useCaseStore.getState().discoverEasterEgg("mirror-map");
+  useCaseStore.setState({ completedPuzzles: ["deduction"], claimSubmissions: migrateLegacyClaims(["deduction"]) });
   useCaseStore.getState().chooseEnding("trade");
   state = useCaseStore.getState();
 

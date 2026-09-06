@@ -6,6 +6,7 @@ import { ArrowRight, RotateCcw, SkipForward } from "lucide-react";
 import { useFogAudio } from "@/components/audio/AudioProvider";
 import { CASE_NUMBER } from "@/lib/case-data";
 import { useCaseStore } from "@/store/case-store";
+import { SaveBackupPanel } from "@/components/game/SaveBackupPanel";
 
 type BootPhase = "dormant" | "booting" | "login" | "resume";
 
@@ -77,6 +78,7 @@ export function BootSequence({ onEnter }: { onEnter: () => void }) {
     onEnter();
   };
   const restart = () => {
+    if (!window.confirm("重新开始本案？当前调查会重置，已完成的结局与轮次记录会保留。可先导出备份。")) return;
     restartCase();
     cue("paper");
     onEnter();
@@ -134,8 +136,12 @@ export function BootSequence({ onEnter }: { onEnter: () => void }) {
           </motion.section>
         )}
       </AnimatePresence>
+      {phase !== "booting" && <details className="boot-backup"><summary>备份与恢复</summary><SaveBackupPanel onRestore={() => {
+        const restored = useCaseStore.getState();
+        setInput(restored.investigatorCode);
+        setPhase(restored.investigatorCode && restored.bootSeen ? "resume" : "login");
+      }} /></details>}
       <footer className="boot-footer"><span>潮位 3.8m</span><span>本地时间 02:17</span><span>声音仅在交互后启用</span></footer>
     </main>
   );
 }
-

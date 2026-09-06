@@ -12,6 +12,10 @@ interface EvidenceReviewRule {
 }
 
 const evidenceReviewRules: Record<string, EvidenceReviewRule> = {
+  "ev-clock-admin-trace": { verdict: "credible", relation: "supports", relatedIds: ["ev-offset", "ev-port-log"] },
+  "ev-rescue-channel": { verdict: "credible", relation: "supports", relatedIds: ["ev-tape-edit", "ev-toolbox"] },
+  "ev-drum-stencil": { verdict: "credible", relation: "supports", relatedIds: ["ev-port-log", "ev-photo"] },
+  "ev-erasure-fingerprint": { verdict: "credible", relation: "supports", relatedIds: ["ev-closure-order", "ev-seven-map"] },
   "ev-case-file": { verdict: "forged", relation: "contradicts", relatedIds: ["ev-weather", "ev-port-log"] },
   "ev-duty": { verdict: "doubtful", relation: "contradicts", relatedIds: ["ev-offset", "ev-fake-clerk"] },
   "ev-port-log": { verdict: "credible", relation: "supports", relatedIds: ["ev-photo", "ev-manifest"] },
@@ -71,24 +75,33 @@ export function evaluateEvidenceReview(
 
 export function getVerifiedEvidenceIds({
   visibleEvidenceIds,
+  readEvidenceIds,
   legacyVerifiedEvidenceIds,
   touchedEvidenceIds,
   verdicts,
   relations,
 }: {
   visibleEvidenceIds: string[];
+  readEvidenceIds: string[];
   legacyVerifiedEvidenceIds: string[];
   touchedEvidenceIds: string[];
   verdicts: Record<string, EvidenceVerdict>;
   relations: EvidenceRelations;
 }) {
   const visible = new Set(visibleEvidenceIds);
+  const read = new Set(readEvidenceIds);
   const touched = new Set(touchedEvidenceIds);
   const verified = new Set(
     legacyVerifiedEvidenceIds.filter((id) => visible.has(id) && !touched.has(id)),
   );
   for (const id of visibleEvidenceIds) {
-    if (evaluateEvidenceReview(id, verdicts[id] ?? "unmarked", relations[id]).verified) verified.add(id);
+    if (!read.has(id)) continue;
+    const linked = relations[id];
+    const availableRelations = linked ? {
+      supports: linked.supports.filter((other) => other !== id && visible.has(other) && read.has(other)),
+      contradicts: linked.contradicts.filter((other) => other !== id && visible.has(other) && read.has(other)),
+    } : undefined;
+    if (evaluateEvidenceReview(id, verdicts[id] ?? "unmarked", availableRelations).verified) verified.add(id);
   }
   return [...verified];
 }

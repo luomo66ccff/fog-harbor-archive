@@ -207,36 +207,25 @@ test("easter egg discoveries cannot change task or ending availability", async (
   assert.deepEqual(getEndingAvailability(endingContext), beforeEndings);
 });
 
-test("truth, trade, and seventh ending gates remain independently reachable", async () => {
+test("ending gates require proved claims, identity and the specific fourth confrontation", async () => {
   const { evidence } = await loadModule("/lib/evidence-data.ts");
   const { getEndingAvailability } = await loadModule("/lib/ending-engine.ts");
-  const criticalIds = evidence.filter((item) => item.critical).map((item) => item.id);
-  const base = {
-    unlockedEvidenceIds: criticalIds,
-    readEvidenceIds: criticalIds,
-    discoveredAnonymous: false,
-  };
-
-  assert.deepEqual(getEndingAvailability({ ...base, completedPuzzles: [] }), {
-    truth: false,
-    trade: false,
-    seventh: false,
-    critical: criticalIds.length,
-  });
-  const mainSolved = getEndingAvailability({ ...base, completedPuzzles: ["deduction"] });
-  assert.equal(mainSolved.trade, true);
-  assert.equal(mainSolved.truth, true);
-  assert.equal(mainSolved.seventh, false);
-  const allSolved = getEndingAvailability({
-    ...base,
-    completedPuzzles: ["deduction", "hidden"],
-    discoveredAnonymous: true,
-  });
-  assert.equal(allSolved.truth, true);
-  assert.equal(allSolved.trade, true);
-  assert.equal(allSolved.seventh, true);
+  const { migrateLegacyClaims } = await loadModule("/lib/claim-engine.ts");
+  const ids = evidence.map((item) => item.id);
+  const submissions = migrateLegacyClaims(["deduction", "hidden"]);
+  for (const submission of Object.values(submissions)) submission.migrated = false;
+  const context = { unlockedEvidenceIds: ids, readEvidenceIds: ids, completedPuzzles: ["deduction", "hidden"], discoveredAnonymous: true, claimSubmissions: submissions };
+  assert.equal(getEndingAvailability({ ...context, claimSubmissions: {} }).truth, false, "reading every item cannot substitute for a confrontation");
+  assert.equal(getEndingAvailability({ ...context, discoveredAnonymous: false }).truth, false);
+  assert.equal(getEndingAvailability({ ...context, discoveredAnonymous: false }).trade, true);
+  assert.equal(getEndingAvailability({ ...context, claimSubmissions: { ...submissions, "archive02-continuity": undefined } }).seventh, false);
+  assert.equal(getEndingAvailability({ ...context, readEvidenceIds: ids.filter((id) => id !== "ev-erasure-fingerprint") }).seventh, false);
+  assert.equal(getEndingAvailability({ ...context, readEvidenceIds: ids.filter((id) => id !== "ev-drum-stencil") }).truth, false);
+  const availability = getEndingAvailability(context);
+  assert.equal(availability.truth, true);
+  assert.equal(availability.trade, true);
+  assert.equal(availability.seventh, true);
 });
-
 function persistedFallback() {
   return {
     investigatorCode: "",
@@ -356,6 +345,8 @@ test("store records theory revisions, preserves collections across runs, and ind
   assert.equal(useWindowStore.getState().archiveStampClicks, 2);
   assert.deepEqual(useWindowStore.getState().archiveAcrosticTrail, ["doc-weather"]);
 
+  const { migrateLegacyClaims } = await loadModule("/lib/claim-engine.ts");
+  useCaseStore.setState({ completedPuzzles: ["deduction", "hidden"], discoveredAnonymous: true, claimSubmissions: migrateLegacyClaims(["deduction", "hidden"]) });
   state.chooseEnding("seventh");
   state = useCaseStore.getState();
   assert.equal(state.seenNarrativeEvents.includes("investigator-index-written"), false);

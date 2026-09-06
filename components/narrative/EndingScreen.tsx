@@ -80,6 +80,7 @@ export function EndingScreen({ onRestart }: { onRestart: () => void }) {
   const verdicts = useCaseStore((state) => state.evidenceVerdicts);
   const relations = useCaseStore((state) => state.evidenceRelations);
   const touchedIds = useCaseStore((state) => state.evidenceReviewTouchedIds);
+  const readEvidenceIds = useCaseStore((state) => state.readEvidenceIds);
   const legacyVerifiedIds = useCaseStore((state) => state.legacyVerifiedEvidenceIds);
   const seenNarrativeEvents = useCaseStore((state) => state.seenNarrativeEvents);
   const markNarrativeEventSeen = useCaseStore((state) => state.markNarrativeEventSeen);
@@ -91,13 +92,14 @@ export function EndingScreen({ onRestart }: { onRestart: () => void }) {
   const verifiedCriticalCount = useMemo(() => {
     const verifiedIds = new Set(getVerifiedEvidenceIds({
       visibleEvidenceIds: unlockedEvidenceIds,
+      readEvidenceIds,
       legacyVerifiedEvidenceIds: legacyVerifiedIds,
       touchedEvidenceIds: touchedIds,
       verdicts,
       relations,
     }));
     return evidence.filter((item) => item.critical && verifiedIds.has(item.id)).length;
-  }, [legacyVerifiedIds, relations, touchedIds, unlockedEvidenceIds, verdicts]);
+  }, [legacyVerifiedIds, readEvidenceIds, relations, touchedIds, unlockedEvidenceIds, verdicts]);
   const initialTheory = theoryHistory[0]?.split("->")[0];
   const theoryCorrected = theoryHistory.some((entry) => entry.includes("->"));
   const runEasterEggCount = Math.max(0, discoveredEasterEggs.length - runMemory.easterEggCountAtRunStart);
@@ -147,7 +149,7 @@ export function EndingScreen({ onRestart }: { onRestart: () => void }) {
           <dl className="ending-run-review__summary">
             <div><dt>初始临时判断</dt><dd>{initialTheory ? theoryLabels[initialTheory] ?? initialTheory : "未作判断"}</dd></div>
             <div><dt>是否修正</dt><dd>{theoryCorrected ? "是，新证据已写入修正" : "否"}</dd></div>
-            <div><dt>核验关键证据</dt><dd>{verifiedCriticalCount} 项</dd></div>
+            <div><dt>证据墙单项复核</dt><dd>{verifiedCriticalCount} 项</dd></div>
             <div><dt>本轮隐藏发现</dt><dd>{runEasterEggCount} 项</dd></div>
             <div><dt>辅助调查</dt><dd>{assistedInvestigation ? "已使用" : "未使用"}</dd></div>
             <div><dt>本轮时长</dt><dd>{formatRunDuration(runStartedAt, runEndedAt)}</dd></div>

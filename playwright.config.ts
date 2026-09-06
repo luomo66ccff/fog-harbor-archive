@@ -2,6 +2,9 @@ import { defineConfig, devices } from "@playwright/test";
 
 const localBaseUrl = "http://127.0.0.1:4173";
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? localBaseUrl;
+const browserChannel = process.env.PLAYWRIGHT_BROWSER_CHANNEL;
+
+const channelOverride = browserChannel ? { channel: browserChannel } : {};
 
 export default defineConfig({
   testDir: "./e2e",
@@ -34,17 +37,24 @@ export default defineConfig({
       testMatch: [
         /desktop-main-flow\.spec\.ts/,
         /second-run-and-easter-eggs\.spec\.ts/,
+        /(?:^|[\\/])save-recovery\.spec\.ts$/,
+        /(?:^|[\\/])confrontation\.spec\.ts$/,
       ],
       use: {
         ...devices["Desktop Chrome"],
+        ...channelOverride,
         viewport: { width: 1440, height: 900 },
       },
     },
     {
       name: "mobile-chromium",
-      testMatch: /mobile-main-flow\.spec\.ts/,
+      testMatch: [
+        /mobile-main-flow\.spec\.ts/,
+        /(?:^|[\\/])mobile-confrontation\.spec\.ts$/,
+      ],
       use: {
         ...devices["Pixel 5"],
+        ...channelOverride,
         viewport: { width: 390, height: 844 },
       },
     },
@@ -52,7 +62,7 @@ export default defineConfig({
   webServer: process.env.PLAYWRIGHT_BASE_URL
     ? undefined
     : {
-        command: "npm run dev -- --port 4173 --hostname 127.0.0.1",
+        command: "npm run build && npm run start -- --port 4173 --hostname 127.0.0.1",
         url: localBaseUrl,
         reuseExistingServer: !process.env.CI,
         timeout: 120_000,

@@ -1,0 +1,77 @@
+{
+  "format": "fog-harbor-release-evidence",
+  "version": "3.0.0",
+  "revision": "t001",
+  "baselineCommit": "4a1d9cb0db2fed5a8caa6d1df1b0892005810c23",
+  "verifiedAt": "2026-09-06T07:39:48.2035685+00:00",
+  "checks": {
+    "lint": "passed",
+    "types": "passed",
+    "productionBuild": "passed",
+    "productionHttpAndAssets": "passed",
+    "unitTests": {
+      "passed": 46,
+      "failed": 0
+    },
+    "browserTests": {
+      "passed": 20,
+      "failed": 0,
+      "browser": "Microsoft Edge / Chromium",
+      "viewports": [
+        "1440x900",
+        "390x844"
+      ]
+    },
+    "dependencyAudit": {
+      "total": 0
+    },
+    "liveDeployment": "not performed",
+    "dockerBuild": "not performed"
+  },
+  "activeScreenshots": [
+    "docs/screenshots/confrontation-desktop-t003.webp",
+    "docs/screenshots/confrontation-mobile-t003.webp"
+  ],
+  "artifacts": [
+    {
+      "path": "docs/releases/upgrade-t001.md",
+      "bytes": 6227,
+      "sha256": "66a79fee51f6afb9099776f7b8d350dd90277d87719b617a28b5c95d54b66fe7"
+    },
+    {
+      "path": "docs/security/dependency-audit-t001.md",
+      "bytes": 1266,
+      "sha256": "3614d21d1906570c5c1d0ddfcdac76ef4af5902f2b56027ceff5d864d0b743a6"
+    },
+    {
+      "path": "docs/screenshots/confrontation-desktop-t001.webp",
+      "bytes": 65150,
+      "sha256": "c0de287b9fe57cfb990742911b85d65788258f34aa81deddd311e5422e31a27d"
+    },
+    {
+      "path": "docs/screenshots/confrontation-desktop-t002.webp",
+      "bytes": 60128,
+      "sha256": "fe3fca0b21f0361c50e8c4c5b99c87e3f3112a2eaffe1e9c9868a0abf5214b5c"
+    },
+    {
+      "path": "docs/screenshots/confrontation-desktop-t003.webp",
+      "bytes": 59994,
+      "sha256": "bb0ab0afdfb3421a54a543782c8ff546d961c3e0984b345741f7080bc6eaf20f"
+    },
+    {
+      "path": "docs/screenshots/confrontation-mobile-t001.webp",
+      "bytes": 37442,
+      "sha256": "a2778c1b9cda073bfe3262607c09ab506046b40a0ce8bf27c43d16420117d7e0"
+    },
+    {
+      "path": "docs/screenshots/confrontation-mobile-t002.webp",
+      "bytes": 40402,
+      "sha256": "1f4c451f8f2d2678c4d38a2bf72dd5f0315ceb9c39ad63a505eb6c5800a4fae2"
+    },
+    {
+      "path": "docs/screenshots/confrontation-mobile-t003.webp",
+      "bytes": 40402,
+      "sha256": "1f4c451f8f2d2678c4d38a2bf72dd5f0315ceb9c39ad63a505eb6c5800a4fae2"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+* text=auto eol=lf
+*.webp -text
+*.png -text
+*.ico -text
+# Versioned evidence must retain the exact bytes recorded by its manifest.
+docs/releases/* -text
+docs/security/dependency-audit-*.md -text

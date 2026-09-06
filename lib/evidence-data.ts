@@ -1,6 +1,10 @@
 import type { Evidence } from "@/types/evidence";
 
 export const evidence: Evidence[] = [
+  { id: "ev-clock-admin-trace", index: "E-07B", title: "主时钟管理员会话残片", type: "record", description: "只读审计镜像：2019.07.12 00:31:00，JM-ZHOU 使用本地维护钥匙登录 CTRL-NTP-ROOT；00:31:06 将港务主时钟偏移从 +00:00 改为 +00:11，安排 01:08 回滚。AWS-3、机械岸钟与通信节点均不在本次校时域内。03:12 的模板清理删除了在线日志，但只读镜像保留了操作者、偏移量和受影响设备。这次修改发生在白鹭七号靠泊之后、最后通话之前。", acquiredAt: "完成时间表比对", source: "独立只读审计镜像", relatedPeople: ["zhou-jiming"], relatedLocations: ["loc-control"], relatedTime: "00:31—03:12", critical: true, unlockAfter: "schedule", relatedEvidence: ["ev-duty", "ev-offset", "ev-port-log"] },
+  { id: "ev-rescue-channel", index: "E-08C", title: "检修频段三敲应答", type: "audio", description: "纸带中的呼号指向一份独立港内电台缓存。00:39:48，女声说：‘A-17 停后数到一百二十六，三短敲，走外侧梯。’00:40:06 报警关闭；00:42:12 出现三次金属敲击，M-4 回答：‘梯子会放下，艇不走正门。’00:48:52，M-4 报告‘已接到人，走维护水道’；同号应答器随后从维修航道离港。设备登记属于陈牧的检修艇。记录证明接应与离港，但没有录下被接走者姓名。", acquiredAt: "完成录音解析", source: "港内电台独立缓存", relatedPeople: ["chen-mu", "xu-wancheng"], relatedLocations: ["loc-pier7"], relatedTime: "00:39:48—00:48:52", critical: true, unlockAfter: "frequency", relatedEvidence: ["ev-audio-0712", "ev-tape-edit", "ev-toolbox", "ev-photo"] },
+  { id: "ev-drum-stencil", index: "E-10B", title: "铅封桶危废残码", type: "photo", description: "扫描仪对照片暗部做分层辨读后，三只桶显出灰漆下的旧标记：K-7、Hg/SONAR-SLUDGE 与危废转运标签。批次尾码与泊位称重板记录一致，船身同时可读出 H-1707。这张图像是完整照片的派生材料，不能算第二份独立目击。它与纸本重量记录共同指向 12.1 吨含汞声呐污泥，排除了‘盐度校准砝码’的申报；最终倾倒地点与付款对象仍需其他材料证明。", acquiredAt: "完成照片拼合", source: "完整照片的分层辨读", relatedPeople: ["gu-weian"], relatedLocations: ["loc-pier7"], relatedTime: "00:43", critical: true, unlockAfter: "photo", relatedEvidence: ["ev-port-log", "ev-photo", "ev-payment", "ev-manifest"] },
+  { id: "ev-erasure-fingerprint", index: "E-21B", title: "ARCHIVE-02 销毁器指纹", type: "record", description: "第七层索引解密了历史作业清单。2019.07.12 03:12，ARC-PURGE/7 把本案天气、靠泊与人员索引改成统一模板；当前 ARCHIVE-02 又使用相同的 0712-7E 校验盐、字段顺序和 0.8 秒重建延迟复制被删页面。两个节点地址不同，却沿用具有辨识性的作业指纹。潮汐_0 的声纹会话来自另一条只读通道。这证明封存流程延续至今，无法确认今天的操作者姓名。", acquiredAt: "完成隐藏口令", source: "历史作业清单与当前会话差分", relatedPeople: [], relatedLocations: ["loc-archive"], relatedTime: "2019 / 当前", critical: true, unlockAfter: "hidden", relatedEvidence: ["ev-closure-order", "ev-seven-map", "ev-commission"] },
   { id: "ev-commission", index: "E-01", title: "匿名调查委托", type: "message", description: "潮汐_0 要求恢复 P-07-0712，并声称能看见调查进度。", acquiredAt: "会话开始", source: "收件箱", relatedPeople: [], relatedLocations: ["loc-archive"], relatedTime: "当前", critical: false, relatedEvidence: ["ev-case-file"] },
   { id: "ev-case-file", index: "E-02", title: "官方结案摘要", type: "document", description: "将事件定性为暴雨中的意外落水，并刻意排除船舶记录。", acquiredAt: "档案恢复", source: "案情卷宗", relatedPeople: ["lin-zhixia"], relatedLocations: ["loc-pier7"], relatedTime: "00:54", critical: true, relatedEvidence: ["ev-weather", "ev-closure-order"] },
   { id: "ev-duty", index: "E-03", title: "夜班签到与校时表", type: "record", description: "周既明的监控室时间为手写补录；叶澜没有门禁编号。", acquiredAt: "档案恢复", source: "系统科纸本", relatedPeople: ["zhou-jiming", "ye-lan"], relatedLocations: ["loc-control"], relatedTime: "00:42", critical: true, relatedEvidence: ["ev-offset", "ev-fake-clerk"] },
@@ -36,9 +40,9 @@ export const initialEvidenceIds = [
 ];
 
 export const puzzleRewards: Record<string, string[]> = {
-  schedule: ["ev-offset"],
-  frequency: ["ev-audio-0712", "ev-tape-edit", "ev-photo-packet"],
-  photo: ["ev-photo", "ev-cctv", "ev-toolbox", "ev-draft", "ev-payment"],
+  schedule: ["ev-offset", "ev-clock-admin-trace"],
+  frequency: ["ev-audio-0712", "ev-tape-edit", "ev-photo-packet", "ev-rescue-channel"],
+  photo: ["ev-photo", "ev-cctv", "ev-toolbox", "ev-draft", "ev-payment", "ev-drum-stencil"],
   deduction: ["ev-fake-clerk", "ev-manifest", "ev-medical-context", "ev-notebook", "ev-closure-order", "ev-final-chain"],
-  hidden: ["ev-seven-map"],
+  hidden: ["ev-seven-map", "ev-erasure-fingerprint"],
 };
