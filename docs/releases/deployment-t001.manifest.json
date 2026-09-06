@@ -1,0 +1,302 @@
+{
+  "format": "fog-harbor-deployment-evidence",
+  "schemaVersion": 1,
+  "createdAt": "2026-09-06T08:54:12.556Z",
+  "site": "https://fog-harbor-archive.luomo.moe",
+  "applicationVersion": "3.0.0",
+  "applicationCommit": "74c37971a055acb0a955eab386fcd7f7b90cce01",
+  "checks": {
+    "githubCI": {
+      "status": "passed",
+      "url": "https://github.com/luomo66ccff/fog-harbor-archive/actions/runs/34022471764"
+    },
+    "linuxImage": {
+      "status": "passed",
+      "url": "https://github.com/luomo66ccff/fog-harbor-archive/actions/runs/34022477196"
+    },
+    "publicBrowser": {
+      "browser": "Edge Chromium",
+      "baseURL": "https://fog-harbor-archive.luomo.moe",
+      "viewports": [
+        "1440x900",
+        "390x844"
+      ],
+      "startTime": "2026-09-06T08:49:30.539Z",
+      "duration": 53674.905,
+      "expected": 20,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0,
+      "tests": [
+        {
+          "title": "an unsubmitted draft survives changing topics and reopening the browser",
+          "project": "desktop-chromium",
+          "status": "expected",
+          "outcomes": [
+            "passed"
+          ]
+        },
+        {
+          "title": "incorrect claims remain revisable and verified work survives a reload",
+          "project": "desktop-chromium",
+          "status": "expected",
+          "outcomes": [
+            "passed"
+          ]
+        },
+        {
+          "title": "truth requires all three real confrontations and verified identity",
+          "project": "desktop-chromium",
+          "status": "expected",
+          "outcomes": [
+            "passed"
+          ]
+        },
+        {
+          "title": "the hidden password alone cannot open the seventh ending",
+          "project": "desktop-chromium",
+          "status": "expected",
+          "outcomes": [
+            "passed"
+          ]
+        },
+        {
+          "title": "desktop investigation reaches a real ending through every core puzzle",
+          "project": "desktop-chromium",
+          "status": "expected",
+          "outcomes": [
+            "passed"
+          ]
+        },
+        {
+          "title": "assisted investigation mode remains fully playable",
+          "project": "desktop-chromium",
+          "status": "expected",
+          "outcomes": [
+            "passed"
+          ]
+        },
+        {
+          "title": "blocked browser storage still allows a complete time puzzle and backup",
+          "project": "desktop-chromium",
+          "status": "expected",
+          "outcomes": [
+            "passed"
+          ]
+        },
+        {
+          "title": "mobile backup restore requires a preview and invalid files leave the case intact",
+          "project": "desktop-chromium",
+          "status": "expected",
+          "outcomes": [
+            "passed"
+          ]
+        },
+        {
+          "title": "a legacy ending is migrated without altering the original v1 file",
+          "project": "desktop-chromium",
+          "status": "expected",
+          "outcomes": [
+            "passed"
+          ]
+        },
+        {
+          "title": "seven seal activations reveal a secret without changing case completion",
+          "project": "desktop-chromium",
+          "status": "expected",
+          "outcomes": [
+            "passed"
+          ]
+        },
+        {
+          "title": "second run exposes the pencil note while the first run does not",
+          "project": "desktop-chromium",
+          "status": "expected",
+          "outcomes": [
+            "passed"
+          ]
+        },
+        {
+          "title": "mobile rain trace remains readable and clickable without covering the launcher",
+          "project": "desktop-chromium",
+          "status": "expected",
+          "outcomes": [
+            "passed"
+          ]
+        },
+        {
+          "title": "choosing the seventh ending records and renders the local investigator index",
+          "project": "desktop-chromium",
+          "status": "expected",
+          "outcomes": [
+            "passed"
+          ]
+        },
+        {
+          "title": "mirror map starts as a quiet symbol and becomes explicit only after discovery",
+          "project": "desktop-chromium",
+          "status": "expected",
+          "outcomes": [
+            "passed"
+          ]
+        },
+        {
+          "title": "second-run knock waits for real inactivity across pointer movement",
+          "project": "desktop-chromium",
+          "status": "expected",
+          "outcomes": [
+            "passed"
+          ]
+        },
+        {
+          "title": "external reader beat waits until the final dossier is actually open",
+          "project": "desktop-chromium",
+          "status": "expected",
+          "outcomes": [
+            "passed"
+          ]
+        },
+        {
+          "title": "truth and trade endings render their distinct aftermath",
+          "project": "desktop-chromium",
+          "status": "expected",
+          "outcomes": [
+            "passed"
+          ]
+        },
+        {
+          "title": "investigation log opens, groups runs, and exports a sanitized text file",
+          "project": "desktop-chromium",
+          "status": "expected",
+          "outcomes": [
+            "passed"
+          ]
+        },
+        {
+          "title": "touch investigation can prove the fourth claim and choose the seventh ending",
+          "project": "mobile-chromium",
+          "status": "expected",
+          "outcomes": [
+            "passed"
+          ]
+        },
+        {
+          "title": "390×844 touch flow preserves the complete investigation",
+          "project": "mobile-chromium",
+          "status": "expected",
+          "outcomes": [
+            "passed"
+          ]
+        }
+      ]
+    },
+    "publicScreenshots": {
+      "pageErrors": 0,
+      "consoleErrors": 0,
+      "horizontalOverflow": false,
+      "visuallyReviewed": true
+    }
+  },
+  "server": {
+    "format": "fog-harbor-server-deployment",
+    "version": 1,
+    "checkedAt": "2026-09-06T08:51:48.976221+00:00",
+    "site": "https://fog-harbor-archive.luomo.moe",
+    "mergeCommit": "41ab13d9744ee458ff3a8f9c1d279d5f3211baca",
+    "applicationCommit": "74c37971a055acb0a955eab386fcd7f7b90cce01",
+    "releasePath": "/home/luomo/apps/fog-harbor-archive/releases/v3.0.0-74c3797-t001",
+    "previousRelease": "/home/luomo/apps/fog-harbor-archive/releases/v2.2.0-4a1d9cb-20260715",
+    "cutoverStarted": "2026-09-06T08:48:48Z",
+    "cutoverCompleted": "2026-09-06T08:48:55Z",
+    "runtime": {
+      "node": "v24.20.0",
+      "version": "3.0.0"
+    },
+    "container": {
+      "imageRef": "fog-harbor-archive:74c37971a055acb0a955eab386fcd7f7b90cce01",
+      "imageManifestId": "sha256:6ce440673d5401317ee9d09998c1e7ffe433a196f802477085c99179e6a292dd",
+      "imageConfigId": "sha256:63960759e7d1e431856e1e12011367e9a4461003dba83c2315e3dae04c89c4b7",
+      "health": "healthy",
+      "restartCount": 0,
+      "oomKilled": false,
+      "startedAt": "2026-09-06T08:48:48.920298248Z",
+      "nonRootUser": "nextjs"
+    },
+    "tunnelUnchanged": true,
+    "rollback": {
+      "archiveRetained": true,
+      "isolatedOldImageProbe": "passed",
+      "liveRollbackPerformed": false,
+      "script": "/home/luomo/apps/fog-harbor-archive/backups/deploy-t001/rollback.sh"
+    },
+    "artifacts": [
+      {
+        "path": "/home/luomo/apps/fog-harbor-archive/backups/deploy-t001/image/image.tar.gz",
+        "bytes": 80151505,
+        "sha256": "5581707c9926eb8a08a555e80247e34170c019efc66934439473199570edc82e"
+      },
+      {
+        "path": "/home/luomo/apps/fog-harbor-archive/backups/deploy-t001/rollback-image.tar.gz",
+        "bytes": 71311768,
+        "sha256": "8fc90466d9619af0354301a8bdb83895e894a578ee87a187e74c9a9112664e2a"
+      },
+      {
+        "path": "/home/luomo/apps/fog-harbor-archive/backups/deploy-t001/source.tar.gz",
+        "bytes": 31113742,
+        "sha256": "564f613da55442228194e84594ab2ebd3b1cef50ecdec0d6d43f23bdc377fd28"
+      },
+      {
+        "path": "/home/luomo/apps/fog-harbor-archive/backups/deploy-t001/baseline-origin.json",
+        "bytes": 423,
+        "sha256": "bbdab89544e37e1bfa7e598176af6a54115e35306b959e8227a8a940691e6e97"
+      },
+      {
+        "path": "/home/luomo/apps/fog-harbor-archive/backups/deploy-t001/rollback-check.json",
+        "bytes": 424,
+        "sha256": "9c05b4d53628816bbe1e1a4047594494e36eb455889e2ed18171b3723cf2c072"
+      },
+      {
+        "path": "/home/luomo/apps/fog-harbor-archive/backups/deploy-t001/staging-check.json",
+        "bytes": 424,
+        "sha256": "c371512644d4c09faeb2ee060a50bc39989322d2a316a91dcbb86c7145ab7aab"
+      },
+      {
+        "path": "/home/luomo/apps/fog-harbor-archive/backups/deploy-t001/deployed-origin.json",
+        "bytes": 423,
+        "sha256": "6b8c5d9763a5c179e5346fbda5f1ec0d41d5e0d62afdc7067c07355e09526db8"
+      },
+      {
+        "path": "/home/luomo/apps/fog-harbor-archive/backups/deploy-t001/final-origin.json",
+        "bytes": 423,
+        "sha256": "6b8c5d9763a5c179e5346fbda5f1ec0d41d5e0d62afdc7067c07355e09526db8"
+      },
+      {
+        "path": "/home/luomo/apps/fog-harbor-archive/backups/deploy-t001/rollback.sh",
+        "bytes": 1027,
+        "sha256": "fe52e0c18e22c301ccf32ee447e5fcc7501c4a51e15a4ee587ff84c68969e479"
+      },
+      {
+        "path": "/home/luomo/apps/fog-harbor-archive/backups/deploy-t001/deploy.sh",
+        "bytes": 1549,
+        "sha256": "fa5fb9b47455771d4721b0625224e26f27ab017dd94a82263b3f6622c79cb78d"
+      }
+    ]
+  },
+  "artifacts": [
+    {
+      "path": "docs/releases/deployment-t001.md",
+      "bytes": 3721,
+      "sha256": "d329a1826333b0462a23916ff3ba73a13fc01fba74f3992414cd7cf28bf6a570"
+    },
+    {
+      "path": "docs/screenshots/confrontation-desktop-t004.webp",
+      "bytes": 60094,
+      "sha256": "a2ed532c8b36f64b24fd9163312edf68cf5bd4e946cbf33cdcdaae45ef213adc"
+    },
+    {
+      "path": "docs/screenshots/confrontation-mobile-t004.webp",
+      "bytes": 40402,
+      "sha256": "1f4c451f8f2d2678c4d38a2bf72dd5f0315ceb9c39ad63a505eb6c5800a4fae2"
+    }
+  ]
+}
