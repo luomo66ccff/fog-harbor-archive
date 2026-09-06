@@ -1,0 +1,83 @@
+name: Server image
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fog-harbor-server-image-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      IMAGE: fog-harbor-archive:${{ github.sha }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Build Linux production image
+        run: |
+          docker build --file Dockerfile.server \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            --tag "$IMAGE" .
+
+      - name: Verify container and production resources
+        run: |
+          set -euo pipefail
+          test "$(docker image inspect --format '{{.Config.User}}' "$IMAGE")" = nextjs
+          docker run --detach --name fog-harbor-smoke \
+            --publish 127.0.0.1:18797:3000 "$IMAGE"
+          trap 'docker logs fog-harbor-smoke; docker rm --force fog-harbor-smoke' EXIT
+          docker exec fog-harbor-smoke node -e \
+            'if (!process.version.startsWith("v24.")) process.exit(1)'
+          node --input-type=module <<'NODE'
+          import assert from "node:assert/strict";
+          const base = "http://127.0.0.1:18797/";
+          let response;
+          for (let i = 0; i < 30; i += 1) {
+            try {
+              response = await fetch(base, { signal: AbortSignal.timeout(2000) });
+              if (response.ok) break;
+            } catch {}
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+          assert.equal(response?.status, 200);
+          assert.match(response.headers.get("content-type") ?? "", /text\/html/);
+          const html = await response.text();
+          assert.match(html, /雾港档案/);
+          const script = html.match(/src="(\/_next\/static\/[^"?]+\.js[^"]*)"/)?.[1];
+          const style = html.match(/href="(\/_next\/static\/[^"?]+\.css[^"]*)"/)?.[1];
+          assert.ok(script && style);
+          for (const [path, type] of [[script, /javascript/], [style, /text\/css/], ["/og-fog-harbor.webp", /image\/webp/]]) {
+            const asset = await fetch(new URL(path, base), { signal: AbortSignal.timeout(5000) });
+            assert.equal(asset.status, 200, path);
+            assert.match(asset.headers.get("content-type") ?? "", type);
+            assert.ok((await asset.arrayBuffer()).byteLength > 0);
+          }
+          console.log("Linux container HTML, JavaScript, CSS and WebP passed.");
+          NODE
+
+      - name: Export versioned image
+        run: |
+          set -euo pipefail
+          mkdir release
+          docker save "$IMAGE" | gzip -1 > release/image.tar.gz
+          cd release
+          sha256sum image.tar.gz > image.sha256
+          docker image inspect --format \
+            '{"imageId":{{json .Id}},"tags":{{json .RepoTags}},"revision":{{json (index .Config.Labels "org.opencontainers.image.revision")}},"user":{{json .Config.User}}}' \
+            "$IMAGE" > image.json
+
+      - name: Upload deployment image
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-image-${{ github.sha }}
+          path: release/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 3
